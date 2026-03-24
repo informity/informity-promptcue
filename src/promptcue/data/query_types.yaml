@@ -1,0 +1,294 @@
+# PromptCue default query type registry
+# Single source of truth for: labels, descriptions, triggers, examples, routing directives,
+# scope, and action hints.
+#
+# triggers     — short phrases for the deterministic classifier (substring matching)
+# examples     — full realistic sentences for the semantic classifier (embedding anchors)
+# scope        — query breadth: broad | focused | comparative | exploratory
+# routing_hints keys: needs_retrieval, needs_reasoning, needs_current_info
+# action_hints keys:  should_survey, should_enumerate, should_compare,
+#                     should_direct_answer, should_check_recency,
+#                     should_clarify, should_respond_conversationally
+
+query_types:
+
+  - label: coverage
+    description: Broad overview or tell-me-everything request. The user wants a wide survey, not a single answer.
+    scope: broad
+    triggers:
+      - tell me everything about
+      - give me an overview
+      - overview of
+      - cover the basics
+      - what should I know about
+      - what should we know about
+      - explain the big picture
+      - big picture
+      - summarize everything
+      - broad overview
+    examples:
+      - give me an overview of this topic
+      - tell me everything you know about this
+      - cover the basics and give me a broad summary
+      - what should I know about this subject
+      - explain the big picture and all the key concepts
+      - summarize the entire landscape for me
+      - explain the complete picture of this technology including all its components and how they work together
+    routing_hints:
+      needs_retrieval:    true
+      needs_reasoning:    false
+      needs_current_info: false
+    action_hints:
+      should_survey:                    true
+      should_enumerate:                 false
+      should_compare:                   false
+      should_direct_answer:             false
+      should_check_recency:             false
+      should_clarify:                   false
+      should_respond_conversationally:  false
+
+  - label: lookup
+    description: Specific, targeted request for a single fact, definition, or detail.
+    scope: focused
+    triggers:
+      - what is
+      - who is
+      - where is
+      - define
+      - what does
+      - how many
+    examples:
+      - define this term or concept for me
+      - what does this acronym or abbreviation mean
+      - what is the exact documented value for this setting
+      - where exactly is this option or parameter configured
+      - what is the specific limit or quota for this
+      - I need the precise specification or default for this field
+    routing_hints:
+      needs_retrieval:    true
+      needs_reasoning:    false
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 false
+      should_compare:                   false
+      should_direct_answer:             true
+      should_check_recency:             false
+      should_clarify:                   false
+      should_respond_conversationally:  false
+
+  - label: comparison
+    description: Request to understand differences or similarities between two or more options. The user wants to explore, not be told what to choose.
+    scope: comparative
+    triggers:
+      - compare
+      - difference between
+      - versus
+      - how does differ from
+      - pros and cons
+      - similarities between
+    examples:
+      - compare these two options and explain the differences
+      - what is the difference between these two services
+      - how does one option differ from the other
+      - what are the pros and cons of each approach
+      - show me a side by side comparison of these alternatives
+      - what are the similarities and differences between these two
+    routing_hints:
+      needs_retrieval:    true
+      needs_reasoning:    true
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 false
+      should_compare:                   true
+      should_direct_answer:             false
+      should_check_recency:             false
+      should_clarify:                   false
+      should_respond_conversationally:  false
+
+  - label: recommendation
+    description: Request for a directive answer — tell me what to choose, use, or do. The user wants a decision, not just a comparison.
+    scope: focused
+    triggers:
+      - should I use
+      - should we use
+      - should I go with
+      - should we go with
+      - which should I choose
+      - which should we choose
+      - what would you recommend
+      - what is the best option for
+      - help me decide
+      - what do you suggest
+    examples:
+      - which option should I use for my use case
+      - what would you recommend for this situation
+      - help me decide which one to choose
+      - what is the best approach for my requirements
+      - should I go with this option or the other one
+      - what do you suggest I use for this problem
+    routing_hints:
+      needs_retrieval:    false
+      needs_reasoning:    true
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 false
+      should_compare:                   true
+      should_direct_answer:             true
+      should_check_recency:             false
+      should_clarify:                   true
+      should_respond_conversationally:  false
+
+  - label: troubleshooting
+    description: Request to diagnose or fix a problem. The user has something broken or failing.
+    scope: focused
+    triggers:
+      - why is this failing
+      - how do I fix
+      - what is wrong with
+      - why is not working
+      - error when
+      - how do I resolve
+    examples:
+      - why is this failing and how do I fix it
+      - my service is throwing an error and I cannot figure out why
+      - how do I resolve this issue that keeps happening
+      - what is wrong with my configuration
+      - I am getting an unexpected error when doing this
+      - how do I debug and fix this problem
+      - my service keeps timing out or failing under high load, what is causing this and how do I fix it
+    routing_hints:
+      needs_retrieval:    true
+      needs_reasoning:    true
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 true
+      should_compare:                   false
+      should_direct_answer:             false
+      should_check_recency:             false
+      should_clarify:                   true
+      should_respond_conversationally:  false
+
+  - label: procedure
+    description: Request for step-by-step instructions or a how-to guide.
+    scope: focused
+    triggers:
+      - how do I
+      - how to
+      - steps to
+      - walk me through
+      - guide me through
+      - what are the steps
+    examples:
+      - how do I set this up step by step
+      - walk me through the process of doing this
+      - what are the steps to configure and deploy this
+      - guide me through setting this up from scratch
+      - how do I install and configure this correctly
+      - what is the procedure for doing this task
+      - how do I configure and set up the required permissions and access controls step by step
+    routing_hints:
+      needs_retrieval:    true
+      needs_reasoning:    true
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 true
+      should_compare:                   false
+      should_direct_answer:             false
+      should_check_recency:             false
+      should_clarify:                   false
+      should_respond_conversationally:  false
+
+  - label: analysis
+    description: Request for evaluation, assessment, or subjective opinion on a topic.
+    scope: exploratory
+    triggers:
+      - analyze
+      - evaluate
+      - assess
+      - what do you think about
+      - is this a good
+      - review this
+    examples:
+      - analyze this approach and tell me if it is a good idea
+      - evaluate the strengths and weaknesses of this design
+      - what do you think about this architecture or solution
+      - assess whether this is a good approach for production
+      - review this implementation and give me your opinion
+      - is this the right way to solve this kind of problem
+    routing_hints:
+      needs_retrieval:    false
+      needs_reasoning:    true
+      needs_current_info: false
+    action_hints:
+      should_survey:                    true
+      should_enumerate:                 false
+      should_compare:                   false
+      should_direct_answer:             false
+      should_check_recency:             false
+      should_clarify:                   false
+      should_respond_conversationally:  false
+
+  - label: update
+    description: Request for recent or current information — latest news, version changes, new releases.
+    scope: focused
+    triggers:
+      - what is the latest
+      - recent changes to
+      - what has changed in
+      - what is new in
+      - latest version of
+      - any recent updates
+    examples:
+      - what is the latest version or most recent release of this
+      - what has changed in the newest version of this product
+      - are there any recent announcements or news about this
+      - what new features were added in the latest release
+      - have there been any recent breaking changes I should know about
+      - what changed between the old version and the new version
+    routing_hints:
+      needs_retrieval:    true
+      needs_reasoning:    false
+      needs_current_info: true
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 false
+      should_compare:                   false
+      should_direct_answer:             true
+      should_check_recency:             true
+      should_clarify:                   false
+      should_respond_conversationally:  false
+
+  - label: chitchat
+    description: Conversational, off-topic, or social exchange with no information need.
+    scope: broad
+    triggers:
+      - hello
+      - hi there
+      - thank you
+      - thanks for
+      - how are you
+      - goodbye
+    examples:
+      - hello how are you doing today
+      - thanks that was really helpful
+      - hi there good morning
+      - thank you so much for your help
+      - goodbye talk to you later
+      - that is great I appreciate it
+    routing_hints:
+      needs_retrieval:    false
+      needs_reasoning:    false
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 false
+      should_compare:                   false
+      should_direct_answer:             false
+      should_check_recency:             false
+      should_clarify:                   false
+      should_respond_conversationally:  true

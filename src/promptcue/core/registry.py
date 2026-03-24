@@ -1,0 +1,127 @@
+# informity-promptcue | Query type registry — loads and validates query_types.yaml
+# Maintainer: Informity
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import yaml
+
+from promptcue.constants import PCUE_DEFAULT_REGISTRY, PCUE_SCOPE_UNKNOWN
+from promptcue.exceptions import PromptCueRegistryError
+
+
+@dataclass(slots=True)
+class PromptCueTypeDefinition:
+    """A single query type entry loaded from the YAML registry."""
+    label:         str
+    description:   str
+    triggers:      list[str]       # short phrases for deterministic substring matching
+    examples:      list[str]       # full sentences for semantic embedding anchors
+    routing_hints: dict[str, bool]
+    scope:         str             # broad | focused | comparative | exploratory
+    action_hints:  dict[str, bool] # response-generation directives
+
+
+class PromptCueRegistry:
+    """Holds the full set of query type definitions loaded from a YAML file.
+
+    Can be constructed from a YAML path (via from_yaml) or from an explicit
+    list of PromptCueTypeDefinition objects (for testing).  Validates on construction.
+    """
+
+    def __init__(self, definitions: list[PromptCueTypeDefinition] | None = None) -> None:
+        if definitions is None:
+            loaded           = self.from_yaml(PCUE_DEFAULT_REGISTRY)
+            self.definitions = loaded.definitions
+        else:
+            self._validate(definitions)
+            self.definitions = definitions
+
+    # ==============================================================================
+    # Queries
+    # ==============================================================================
+
+    def get_query_types(self) -> list[PromptCueTypeDefinition]:
+        """Return a copy of all registered type definitions."""
+        return list(self.definitions)
+
+    def get_by_label(self, label: str) -> PromptCueTypeDefinition | None:
+        """Return the definition for *label*, or None if not found."""
+        for definition in self.definitions:
+            if definition.label == label:
+                return definition
+        return None
+
+    # ==============================================================================
+    # Loading
+    # ==============================================================================
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> PromptCueRegistry:
+        try:
+            raw = yaml.safe_load(path.read_text())
+        except Exception as exc:
+            raise PromptCueRegistryError(f'Unable to load query type registry from {path}') from exc
+
+        definitions = [
+            PromptCueTypeDefinition(
+                label         = item['label'],
+                description   = item.get('description', ''),
+                triggers      = item.get('triggers', []),
+                examples      = item.get('examples', []),
+                routing_hints = item.get('routing_hints', {}),
+                scope         = item.get('scope', PCUE_SCOPE_UNKNOWN),
+                action_hints  = item.get('action_hints', {}),
+            )
+            for item in raw.get('query_types', [])
+        ]
+        instance = cls.__new__(cls)
+        instance._validate(definitions)
+        instance.definitions = definitions
+        return instance
+
+    # ==============================================================================
+    # Validation
+    # ==============================================================================
+
+    @staticmethod
+    def _validate(definitions: list[PromptCueTypeDefinition]) -> None:
+        seen_labels: set[str] = set()
+        for defn in definitions:
+            if not defn.label or not isinstance(defn.label, str):
+                raise PromptCueRegistryError('Each query type entry must have a non-empty string label.')
+            if defn.label in seen_labels:
+                raise PromptCueRegistryError(f'Duplicate label in registry: "{defn.label}".')
+            seen_labels.add(defn.label)
+
+            if not defn.description or not isinstance(defn.description, str):
+                raise PromptCueRegistryError(f'Entry "{defn.label}" must have a non-empty description.')
+
+            if not defn.examples or not isinstance(defn.examples, list):
+                raise PromptCueRegistryError(
+                    f'Entry "{defn.label}" must have at least one example sentence.'
+                )
+            for ex in defn.examples:
+                if not isinstance(ex, str) or not ex.strip():
+                    raise PromptCueRegistryError(
+                        f'Entry "{defn.label}" contains an empty or non-string example.'
+                    )
+            for tr in defn.triggers:
+                if not isinstance(tr, str) or not tr.strip():
+                    raise PromptCueRegistryError(
+                        f'Entry "{defn.label}" contains an empty or non-string trigger.'
+                    )
+
+            for key, val in defn.routing_hints.items():
+                if not isinstance(val, bool):
+                    raise PromptCueRegistryError(
+                        f'Entry "{defn.label}" routing_hint "{key}" must be a boolean.'
+                    )
+
+            for key, val in defn.action_hints.items():
+                if not isinstance(val, bool):
+                    raise PromptCueRegistryError(
+                        f'Entry "{defn.label}" action_hint "{key}" must be a boolean.'
+                    )
