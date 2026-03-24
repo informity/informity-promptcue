@@ -69,6 +69,11 @@ class PromptCueRegistry:
         except (OSError, yaml.YAMLError) as exc:
             raise PromptCueRegistryError(f'Unable to load query type registry from {path}') from exc
 
+        if not isinstance(raw, dict):
+            raise PromptCueRegistryError(
+                f'Registry file {path} is empty or does not contain a valid YAML mapping.'
+            )
+
         definitions = [
             PromptCueTypeDefinition(
                 label         = item['label'],

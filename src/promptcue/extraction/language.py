@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import threading
+
 from promptcue.constants import PCUE_UNKNOWN
 
 
@@ -24,6 +26,7 @@ class PromptCueLanguageDetector:
     def __init__(self, enabled: bool = False) -> None:
         self.enabled   = enabled
         self._loaded   = False
+        self._lock     = threading.Lock()
 
     @property
     def is_loaded(self) -> bool:
@@ -51,11 +54,14 @@ class PromptCueLanguageDetector:
         """Verify langdetect is importable. Raises a clear error if missing."""
         if self._loaded:
             return
-        try:
-            import langdetect  # noqa: F401
-            self._loaded = True
-        except ImportError as exc:
-            raise ImportError(
-                'Language detection requires langdetect. '
-                'Install it with: pip install "promptcue[detection]"'
-            ) from exc
+        with self._lock:
+            if self._loaded:
+                return
+            try:
+                import langdetect  # noqa: F401
+                self._loaded = True
+            except ImportError as exc:
+                raise ImportError(
+                    'Language detection requires langdetect. '
+                    'Install it with: pip install "promptcue[detection]"'
+                ) from exc
