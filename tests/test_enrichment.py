@@ -66,7 +66,19 @@ def test_keyword_missing_dep_raises_import_error() -> None:
 # spaCy linguistic extraction (skipped if spaCy not installed)
 # ==============================================================================
 
-spacy = pytest.importorskip('spacy', reason='spaCy not installed — skipping linguistic tests')
+def _spacy_model_available() -> bool:
+    try:
+        import spacy
+        spacy.load('en_core_web_sm')
+        return True
+    except (ImportError, OSError):
+        return False
+
+if not _spacy_model_available():
+    pytest.skip(
+        'spaCy or en_core_web_sm model not available — skipping linguistic tests',
+        allow_module_level=True,
+    )
 
 
 @pytest.fixture(scope='module')

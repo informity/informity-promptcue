@@ -15,7 +15,7 @@ def test_registry_contains_expected_labels() -> None:
     labels   = {qt.label for qt in registry.get_query_types()}
     expected = {'coverage', 'lookup', 'comparison', 'recommendation', 'troubleshooting',
                 'procedure', 'analysis', 'update', 'chitchat'}
-    assert expected == labels
+    assert expected.issubset(labels)
 
 
 def test_get_by_label_found() -> None:

@@ -56,7 +56,9 @@ def test_coverage_query_is_broad_scope() -> None:
 
 
 def test_analysis_query_is_exploratory_scope() -> None:
-    result = PromptCueAnalyzer().analyze('evaluate this architecture and tell me if it is a good idea')
+    result = PromptCueAnalyzer().analyze(
+        'evaluate this architecture and tell me if it is a good idea'
+    )
     assert result.scope == PCUE_SCOPE_EXPLORATORY
 
 
@@ -112,7 +114,8 @@ def test_ambiguous_query_sets_should_clarify() -> None:
 
 
 def test_below_threshold_sets_clarify_in_action_hints() -> None:
-    analyzer = PromptCueAnalyzer(PromptCueConfig(similarity_threshold=0.99))  # unreachable threshold
+    # similarity_threshold=0.99 is unreachable → forces below-threshold path
+    analyzer = PromptCueAnalyzer(PromptCueConfig(similarity_threshold=0.99))
     result   = analyzer.analyze('compare aurora and opensearch for rag')
     assert result.action_hints.get(PCUE_ACTION_CLARIFY) is True
 
@@ -135,7 +138,10 @@ def _spacy_model_available() -> bool:
         return False
 
 if not _spacy_model_available():
-    pytest.skip('spaCy or en_core_web_sm model not available — skipping entity tests', allow_module_level=True)
+    pytest.skip(
+        'spaCy or en_core_web_sm model not available — skipping entity tests',
+        allow_module_level=True,
+    )
 
 
 def test_entities_are_promptcue_entity_instances() -> None:

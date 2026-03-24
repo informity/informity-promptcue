@@ -128,8 +128,8 @@ class PromptCueClassifier:
                     # Longest match wins — proxy for trigger specificity.
                     best        = max(matched, key=len)
                     specificity = min(len(best) / 35.0, 1.0)   # normalise; 35 chars ≈ long trigger
-                    score       = round(0.60 + 0.25 * specificity, 4)
-                    basis       = PCUE_BASIS_TRIGGER_MATCH
+                    score = round(0.60 + 0.25 * specificity, 4)
+                    basis = PCUE_BASIS_TRIGGER_MATCH
                 else:
                     # Soft word-overlap fallback across all type vocabulary.
                     type_text  = ' '.join(
@@ -147,7 +147,9 @@ class PromptCueClassifier:
                         score = 0.10
                         basis = PCUE_BASIS_FALLBACK
 
-            scores.append(PromptCueCandidate(label=definition.label, score=min(score, 1.0), basis=basis))
+            scores.append(PromptCueCandidate(
+                label=definition.label, score=min(score, 1.0), basis=basis,
+            ))
 
         scores.sort(key=lambda item: item.score, reverse=True)
         return PromptCueClassificationResult(candidates=scores)

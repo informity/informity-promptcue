@@ -73,8 +73,8 @@ class PromptCueQueryObject(BaseModel):
     # ==============================================================================
     main_verbs:     list[str]        = Field(default_factory=list)
     noun_phrases:   list[str]        = Field(default_factory=list)
-    named_entities: list[str]        = Field(default_factory=list)  # plain text, backward compat
-    entities:       list[PromptCueEntity] = Field(default_factory=list)  # structured, with entity_type
+    named_entities: list[str]             = Field(default_factory=list)  # plain text, compat alias
+    entities:       list[PromptCueEntity] = Field(default_factory=list)  # structured (text + type)
 
     # ==============================================================================
     # Keyword enrichment (populated when enable_keyword_extraction=True)

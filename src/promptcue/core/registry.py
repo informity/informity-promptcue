@@ -62,7 +62,7 @@ class PromptCueRegistry:
     def from_yaml(cls, path: Path) -> PromptCueRegistry:
         try:
             raw = yaml.safe_load(path.read_text())
-        except Exception as exc:
+        except (OSError, yaml.YAMLError) as exc:
             raise PromptCueRegistryError(f'Unable to load query type registry from {path}') from exc
 
         definitions = [
@@ -91,13 +91,17 @@ class PromptCueRegistry:
         seen_labels: set[str] = set()
         for defn in definitions:
             if not defn.label or not isinstance(defn.label, str):
-                raise PromptCueRegistryError('Each query type entry must have a non-empty string label.')
+                raise PromptCueRegistryError(
+                    'Each query type entry must have a non-empty string label.'
+                )
             if defn.label in seen_labels:
                 raise PromptCueRegistryError(f'Duplicate label in registry: "{defn.label}".')
             seen_labels.add(defn.label)
 
             if not defn.description or not isinstance(defn.description, str):
-                raise PromptCueRegistryError(f'Entry "{defn.label}" must have a non-empty description.')
+                raise PromptCueRegistryError(
+                    f'Entry "{defn.label}" must have a non-empty description.'
+                )
 
             if not defn.examples or not isinstance(defn.examples, list):
                 raise PromptCueRegistryError(
