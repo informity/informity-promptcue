@@ -1,4 +1,4 @@
-# promptcue | Query type registry — loads and validates query_types.yaml
+# promptcue | Query type registry — loads and validates query_types_en.yaml
 # Maintainer: Informity
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ class PromptCueTypeDefinition:
     description:   str
     triggers:      list[str]       # short phrases for deterministic substring matching
     examples:      list[str]       # full sentences for semantic embedding anchors
+    negatives:     list[str]       # sentences this type should NOT match (penalty scoring)
     routing_hints: dict[str, bool]
     scope:         str             # broad | focused | comparative | exploratory
     action_hints:  dict[str, bool] # response-generation directives
@@ -80,6 +81,7 @@ class PromptCueRegistry:
                 description   = item.get('description', ''),
                 triggers      = item.get('triggers', []),
                 examples      = item.get('examples', []),
+                negatives     = item.get('negatives', []),
                 routing_hints = item.get('routing_hints', {}),
                 scope         = item.get('scope', PCUE_SCOPE_UNKNOWN),
                 action_hints  = item.get('action_hints', {}),

@@ -15,8 +15,15 @@ query_types:
   - label: coverage
     description: Broad overview or tell-me-everything request. The user wants a wide survey, not a single answer.
     scope: broad
+    negatives:
+      - what is the exact definition of this term                       # → lookup
+      - how do I set this up from scratch step by step                  # → procedure
+      - summarize the document I just shared with you                   # → summarization
+      - explain briefly how this works in a nutshell                    # → summarization
+      - explain what this concept is in a concise way                   # → summarization
     triggers:
       - tell me everything about
+      - tell me about
       - give me an overview
       - overview of
       - cover the basics
@@ -59,6 +66,10 @@ query_types:
   - label: lookup
     description: Specific, targeted request for a single fact, definition, or detail.
     scope: focused
+    negatives:
+      - give me a broad overview of this entire topic                   # → coverage
+      - compare these two options and explain the differences           # → comparison
+      - how do I install and configure this step by step                # → procedure
     triggers:
       - what is
       - who is
@@ -70,6 +81,12 @@ query_types:
       - define
       - what does
       - how many
+      - list all
+      - find any
+      - which files
+      - what file types
+      - what years are covered
+      - what kind of documents
     examples:
       - define this term or concept for me
       - what does this word or phrase mean
@@ -82,6 +99,11 @@ query_types:
       - what does this abbreviation or acronym stand for
       - what is the precise meaning of this term in this context
       - who invented this and when did it first appear
+      - list all items available in this category
+      - which files contain information about this topic
+      - find any document that matches this search term
+      - what types of files are available
+      - what time period does the data cover
     routing_hints:
       needs_retrieval:    true
       needs_reasoning:    false
@@ -98,6 +120,10 @@ query_types:
   - label: comparison
     description: Request to understand differences or similarities between two or more options. The user wants to explore, not be told what to choose.
     scope: comparative
+    negatives:
+      - which one should I choose given my requirements                 # → recommendation
+      - how do I implement this step by step                            # → procedure
+      - analyze this design and tell me if it is sound                  # → analysis
     triggers:
       - compare
       - difference between
@@ -136,6 +162,10 @@ query_types:
   - label: recommendation
     description: Request for a directive answer — tell me what to choose, use, or do. The user wants a decision, not just a comparison.
     scope: focused
+    negatives:
+      - what are the pros and cons of each option                       # → comparison
+      - how do I set this up from scratch step by step                  # → procedure
+      - evaluate the strengths and weaknesses of this design            # → analysis
     triggers:
       - should I use
       - should we use
@@ -144,12 +174,19 @@ query_types:
       - which should I choose
       - which should we choose
       - what would you recommend
+      - would you recommend
       - what is the best option for
       - help me decide
       - what do you suggest
       - what is the best way to
       - best way to handle
+      - what is the best approach to
       - best approach to
+      - what is the best tool
+      - best tool for
+      - which tool should
+      - what should I use for
+      - what should we use for
     examples:
       - which option should I use for my use case
       - what would you recommend for this situation
@@ -177,6 +214,10 @@ query_types:
   - label: troubleshooting
     description: Request to diagnose or fix a problem. The user has something broken or failing.
     scope: focused
+    negatives:
+      - how do I set this up correctly from scratch                     # → procedure
+      - is this approach correct or am I wrong about it                 # → validation
+      - what are the steps to complete this task from beginning to end  # → procedure
     triggers:
       - why is this failing
       - how do I fix
@@ -189,6 +230,11 @@ query_types:
       - keeps crashing
       - error when
       - how do I resolve
+      - passes locally
+      - works locally but
+      - works on my machine
+      - but fails in ci
+      - but fails in production
     examples:
       - why is this failing and how do I fix it
       - something is throwing an error and I cannot figure out why
@@ -219,6 +265,10 @@ query_types:
   - label: procedure
     description: Request for step-by-step instructions or a how-to guide.
     scope: focused
+    negatives:
+      - why is this failing and how do I fix it                         # → troubleshooting
+      - which option should I use for my situation                      # → recommendation
+      - give me a comprehensive overview of this entire subject         # → coverage
     triggers:
       - how do I
       - how to
@@ -260,15 +310,29 @@ query_types:
   - label: analysis
     description: Request for evaluation, assessment, or subjective opinion on a topic.
     scope: exploratory
+    negatives:
+      - is this statement factually correct or am I wrong about this    # → validation
+      - how do I implement or configure this step by step               # → procedure
+      - what are the differences between these two approaches           # → comparison
     triggers:
       - analyze
       - evaluate
       - assess
+      - assess the risks
+      - assess the security
+      - security risks
+      - attack vectors
       - what do you think about
       - is this a good
+      - still a good choice
+      - is a good choice
+      - good choice for
       - review this
       - what are the trade-offs
       - trade-offs of
+      - are there any contradictions
+      - find any conflicts
+      - identify inconsistencies
     examples:
       - analyze this approach and tell me if it is sound
       - evaluate the strengths and weaknesses of this design
@@ -281,6 +345,9 @@ query_types:
       - tell me what the downsides and risks of this approach are
       - I want your expert opinion on whether this is a good idea
       - analyse this and point out any flaws or blind spots
+      - are there contradictions or inconsistencies across these sources
+      - identify and flag any conflicts between the sources
+      - identify where these sources disagree with each other
     routing_hints:
       needs_retrieval:    false
       needs_reasoning:    true
@@ -297,6 +364,10 @@ query_types:
   - label: update
     description: Request for recent or current information — latest news, version changes, new releases.
     scope: focused
+    negatives:
+      - what is the exact definition or meaning of this term            # → lookup
+      - give me a broad overview of this entire topic area              # → coverage
+      - is my understanding of how this works actually correct          # → validation
     triggers:
       - what is the latest
       - recent changes to
@@ -333,7 +404,12 @@ query_types:
   - label: summarization
     description: Request to condense specific existing content — provided, referenced, or already exchanged — into a shorter form.
     scope: focused
+    negatives:
+      - give me a broad overview of this topic from first principles    # → coverage
+      - write me an original message or email on this subject           # → generation
+      - analyze this and tell me if the approach is sound               # → analysis
     triggers:
+      - summarize
       - summarize this
       - summarize the following
       - give me a summary of
@@ -350,6 +426,14 @@ query_types:
       - key findings
       - main conclusions
       - what came out of
+      - explain briefly
+      - briefly explain
+      - explain in brief
+      - explain how it works
+      - explain what it is
+      - explain what it does
+      - how does it work briefly
+      - in a nutshell
     examples:
       - summarize what was just shared or discussed
       - give me a summary of the content I just provided
@@ -382,6 +466,10 @@ query_types:
   - label: generation
     description: Request to produce or create entirely new content — text, templates, drafts, or other artifacts — from scratch with no existing source to condense.
     scope: focused
+    negatives:
+      - summarize the content I just provided or shared with you        # → summarization
+      - what are the step by step instructions for doing this           # → procedure
+      - what is the exact definition or value of this                   # → lookup
     triggers:
       - write me
       - write a
@@ -424,6 +512,12 @@ query_types:
   - label: validation
     description: Request to verify or fact-check a specific stated claim, assumption, or belief. The user asserts something and wants to know if it is factually correct.
     scope: focused
+    negatives:
+      - analyze this design and give me your expert opinion on it       # → analysis
+      - is this approach overkill for a small project                   # → analysis
+      - is this a good architectural decision for my use case            # → analysis
+      - why is this failing and how do I resolve the error              # → troubleshooting
+      - give me a step by step guide to setting this up                 # → procedure
     triggers:
       - is this correct
       - is it correct that
@@ -438,13 +532,19 @@ query_types:
       - fact check
       - is that true
       - confirm whether
-      - does it make sense to
       - is it accurate that
       - is that actually
-      - is that a safe
-      - is that claim
       - is that always
       - is that really
+      - is it safe to
+      - is it recommended to
+      - is it considered
+      - is this the correct way
+      - is this acceptable
+      - acceptable practice
+      - are there any problems with
+      - are there any issues with
+      - cryptographically sound
     examples:
       - is this claim factually correct or am I wrong about this
       - can you verify whether what I just stated is actually true
@@ -476,6 +576,10 @@ query_types:
   - label: chitchat
     description: Conversational, off-topic, or social exchange with no information need.
     scope: broad
+    negatives:
+      - what is the definition or meaning of this term                  # → lookup
+      - how do I configure and set up this tool step by step            # → procedure
+      - give me a broad overview of this subject area                   # → coverage
     triggers:
       - hello
       - hi there

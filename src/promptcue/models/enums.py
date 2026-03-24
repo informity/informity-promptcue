@@ -14,11 +14,18 @@ class PromptCueScope(StrEnum):
     UNKNOWN      = 'unknown'
 
 
+class PromptCueConfidenceBand(StrEnum):
+    HIGH   = 'high'
+    MEDIUM = 'medium'
+    LOW    = 'low'
+
+
 class PromptCueRoutingHint(StrEnum):
     NEEDS_RETRIEVAL     = 'needs_retrieval'
     NEEDS_REASONING     = 'needs_reasoning'
     NEEDS_CURRENT_INFO  = 'needs_current_info'
     NEEDS_CLARIFICATION = 'needs_clarification'
+    NEEDS_STRUCTURE     = 'needs_structure'
 
 
 class PromptCueActionHint(StrEnum):

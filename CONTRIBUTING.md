@@ -84,7 +84,7 @@ from promptcue import PromptCueAnalyzer, PromptCueConfig, PromptCueQueryObject
 
 ## Adding a new query type
 
-Edit `src/promptcue/data/query_types.yaml`. Each entry requires:
+Edit `src/promptcue/data/query_types_en.yaml`. Each entry requires:
 
 - `label` — unique short string
 - `description` — one sentence

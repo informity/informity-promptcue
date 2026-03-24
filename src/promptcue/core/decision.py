@@ -9,6 +9,7 @@ from promptcue.config import PromptCueConfig
 from promptcue.constants import (
     PCUE_ACTION_CLARIFY,
     PCUE_BASIS_BELOW_THRESHOLD,
+    PCUE_BASIS_TRIGGER_MATCH,
     PCUE_HINT_CLARIFICATION,
     PCUE_HINT_CURRENT_INFO,
     PCUE_HINT_REASONING,
@@ -18,6 +19,7 @@ from promptcue.constants import (
 )
 from promptcue.core.classifier import PromptCueClassificationResult, _top_margin
 from promptcue.core.registry import PromptCueRegistry
+from promptcue.models.enums import PromptCueConfidenceBand
 
 
 @dataclass(slots=True)
@@ -25,6 +27,7 @@ class PromptCueDecisionResult:
     """Resolved output of PromptCueDecisionEngine — the structured classification decision."""
     primary_label:        str
     confidence:           float
+    confidence_band:      PromptCueConfidenceBand
     ambiguity_score:      float
     classification_basis: str
     scope:                str
@@ -43,6 +46,28 @@ class PromptCueDecisionEngine:
     def __init__(self, config: PromptCueConfig, registry: PromptCueRegistry) -> None:
         self.config   = config
         self.registry = registry
+
+    def _confidence_band(
+        self,
+        score: float,
+        basis: str,
+    ) -> PromptCueConfidenceBand:
+        """Map a raw confidence score to a named band.
+
+        Trigger-match results always map to HIGH — the trigger phrase is an
+        explicit intent signal that does not require further calibration.
+        Semantic and word-overlap results are mapped by threshold:
+          score >= confidence_high_threshold   → HIGH
+          score >= confidence_medium_threshold → MEDIUM
+          otherwise                            → LOW
+        """
+        if basis == PCUE_BASIS_TRIGGER_MATCH:
+            return PromptCueConfidenceBand.HIGH
+        if score >= self.config.confidence_high_threshold:
+            return PromptCueConfidenceBand.HIGH
+        if score >= self.config.confidence_medium_threshold:
+            return PromptCueConfidenceBand.MEDIUM
+        return PromptCueConfidenceBand.LOW
 
     def resolve(
         self,
@@ -63,6 +88,7 @@ class PromptCueDecisionEngine:
             return PromptCueDecisionResult(
                 primary_label        = PCUE_UNKNOWN,
                 confidence           = 0.0,
+                confidence_band      = PromptCueConfidenceBand.LOW,
                 ambiguity_score      = 1.0,
                 classification_basis = PCUE_BASIS_BELOW_THRESHOLD,
                 scope                = PCUE_SCOPE_UNKNOWN,
@@ -89,6 +115,7 @@ class PromptCueDecisionEngine:
             return PromptCueDecisionResult(
                 primary_label        = PCUE_UNKNOWN,
                 confidence           = top.score,
+                confidence_band      = PromptCueConfidenceBand.LOW,
                 ambiguity_score      = ambiguity,
                 classification_basis = PCUE_BASIS_BELOW_THRESHOLD,
                 scope                = PCUE_SCOPE_UNKNOWN,
@@ -126,6 +153,7 @@ class PromptCueDecisionEngine:
         return PromptCueDecisionResult(
             primary_label        = top.label,
             confidence           = top.score,
+            confidence_band      = self._confidence_band(top.score, top.basis),
             ambiguity_score      = ambiguity,
             classification_basis = top.basis,
             scope                = scope,

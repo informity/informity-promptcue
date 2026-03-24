@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Iterable
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
+
+from promptcue.exceptions import PromptCueModelLoadError
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
@@ -20,10 +23,20 @@ class PromptCueEmbeddingBackend:
     This keeps PromptCueAnalyzer() fast to instantiate and keeps sentence-transformers
     truly optional when semantic scoring is disabled.  A threading.Lock guards the
     lazy-load path so concurrent first requests do not race to load the model twice.
+
+    If the model cannot be loaded (missing cache, no network, bad path), a
+    PromptCueModelLoadError is raised immediately.  PromptCue does not degrade to
+    deterministic-only mode — that path produces ~40–50% accuracy and is not a
+    supported production configuration.
     """
 
-    def __init__(self, model_name: str = 'all-MiniLM-L6-v2') -> None:
+    def __init__(
+        self,
+        model_name: str       = 'all-MiniLM-L6-v2',
+        cache_dir:  Path | None = None,
+    ) -> None:
         self._model_name  = model_name
+        self._cache_dir   = cache_dir
         self._model: SentenceTransformer | None = None
         self._lock        = threading.Lock()
 
@@ -48,7 +61,7 @@ class PromptCueEmbeddingBackend:
         directly (e.g. tests, custom pipelines).  In the normal PromptCueAnalyzer
         path, warm-up is handled by PromptCueClassifier.warm_up() which triggers
         model loading via _build_example_cache() → encode() → _ensure_model().
-        Calling this method from PromptCueAnalyzer.warm_up() would be redundant.
+        Raises PromptCueModelLoadError if the model cannot be loaded.
         """
         self._ensure_model()
 
@@ -69,7 +82,14 @@ class PromptCueEmbeddingBackend:
                     'Semantic scoring requires the sentence-transformers package. '
                     'Install it with: pip install "promptcue[semantic]"'
                 ) from exc
-            self._model = SentenceTransformer(self._model_name)
+            cache_path = str(self._cache_dir) if self._cache_dir else '<huggingface default>'
+            try:
+                kwargs: dict = {}
+                if self._cache_dir is not None:
+                    kwargs['cache_folder'] = str(self._cache_dir)
+                self._model = SentenceTransformer(self._model_name, **kwargs)
+            except Exception as exc:
+                raise PromptCueModelLoadError(self._model_name, cache_path, exc) from exc
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:

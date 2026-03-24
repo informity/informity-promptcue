@@ -3,9 +3,11 @@
 
 from promptcue.analyzer import PromptCueAnalyzer
 from promptcue.config import PromptCueConfig
+from promptcue.exceptions import PromptCueModelLoadError
 from promptcue.models.enums import (
     PromptCueActionHint,
     PromptCueBasis,
+    PromptCueConfidenceBand,
     PromptCueRoutingHint,
     PromptCueScope,
 )
@@ -16,6 +18,8 @@ __all__ = [
     'PromptCueAnalyzer',
     'PromptCueBasis',
     'PromptCueConfig',
+    'PromptCueConfidenceBand',
+    'PromptCueModelLoadError',
     'PromptCueQueryObject',
     'PromptCueRoutingHint',
     'PromptCueScope',

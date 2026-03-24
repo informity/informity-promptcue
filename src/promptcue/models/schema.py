@@ -10,7 +10,7 @@ from promptcue.constants import (
     PCUE_SCHEMA_VERSION,
     PCUE_UNKNOWN,
 )
-from promptcue.models.enums import PromptCueScope
+from promptcue.models.enums import PromptCueConfidenceBand, PromptCueScope
 
 
 class PromptCueCandidate(BaseModel):
@@ -64,12 +64,19 @@ class PromptCueQueryObject(BaseModel):
     language:              str
 
     # ==============================================================================
+    # Pre-classification signals
+    # Populated before the classifier runs — pure structural / regex checks.
+    # ==============================================================================
+    is_continuation: bool = False
+
+    # ==============================================================================
     # Classification
     # ==============================================================================
     primary_query_type:    str
     classification_basis:  str                 = PCUE_UNKNOWN
     candidate_query_types: list[PromptCueCandidate] = Field(default_factory=list)
     confidence:            float               = Field(ge=0.0, le=1.0)
+    confidence_band:       PromptCueConfidenceBand = PromptCueConfidenceBand.LOW
     ambiguity_score:       float               = Field(ge=0.0, le=1.0)
 
     # ==============================================================================

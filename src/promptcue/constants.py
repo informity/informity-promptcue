@@ -11,7 +11,7 @@ from pathlib import Path
 
 PCUE_PACKAGE_DIR      = Path(__file__).parent
 PCUE_DATA_DIR         = PCUE_PACKAGE_DIR / 'data'
-PCUE_DEFAULT_REGISTRY = PCUE_DATA_DIR / 'query_types.yaml'
+PCUE_DEFAULT_REGISTRY = PCUE_DATA_DIR / 'query_types_en.yaml'
 
 # ==============================================================================
 # Schema versioning
@@ -42,16 +42,17 @@ PCUE_BASIS_FALLBACK        = 'fallback'            # no vocabulary overlap; floo
 PCUE_BASIS_BELOW_THRESHOLD = 'below_threshold'     # top score < similarity_threshold → unknown
 
 # ==============================================================================
-# Known routing hint keys — must mirror keys used in query_types.yaml
+# Known routing hint keys — must mirror keys used in query_types_en.yaml
 # ==============================================================================
 
 PCUE_HINT_RETRIEVAL     = 'needs_retrieval'
 PCUE_HINT_REASONING     = 'needs_reasoning'
 PCUE_HINT_CURRENT_INFO  = 'needs_current_info'
 PCUE_HINT_CLARIFICATION = 'needs_clarification'
+PCUE_HINT_STRUCTURE     = 'needs_structure'
 
 # ==============================================================================
-# Scope values — must mirror values used in query_types.yaml and PromptCueScope enum
+# Scope values — must mirror values used in query_types_en.yaml and PromptCueScope enum
 # ==============================================================================
 
 PCUE_SCOPE_BROAD       = 'broad'
@@ -65,7 +66,7 @@ PCUE_SCOPE_EXPLORATORY = 'exploratory'
 PCUE_SCOPE_UNKNOWN     = 'unknown'
 
 # ==============================================================================
-# Known action hint keys — must mirror keys used in query_types.yaml
+# Known action hint keys — must mirror keys used in query_types_en.yaml
 # These guide response generation: how the LLM should structure its answer.
 # ==============================================================================
 

@@ -188,7 +188,7 @@ PromptCue ships with a default registry of 12 query types:
 | `chitchat` | broad | Social or conversational, not a knowledge query |
 
 You can replace or extend the registry by pointing `PromptCueConfig.registry_path` at your
-own YAML file — the schema is documented in `src/promptcue/data/query_types.yaml`.
+own YAML file — the schema is documented in `src/promptcue/data/query_types_en.yaml`.
 
 ---
 

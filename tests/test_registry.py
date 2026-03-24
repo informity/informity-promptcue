@@ -46,6 +46,7 @@ def _defn(**kwargs) -> PromptCueTypeDefinition:
         description   = 'desc',
         triggers      = ['trig'],
         examples      = ['ex'],
+        negatives     = [],
         routing_hints = {},
         scope         = 'focused',
         action_hints  = {},

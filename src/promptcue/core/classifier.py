@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from promptcue.config import PromptCueConfig
 from promptcue.constants import (
     PCUE_BASIS_FALLBACK,
-    PCUE_BASIS_LABEL_MATCH,
     PCUE_BASIS_SEMANTIC,
     PCUE_BASIS_TRIGGER_MATCH,
     PCUE_BASIS_WORD_OVERLAP,
@@ -51,24 +50,33 @@ _NEGATION_WORDS: frozenset[str] = frozenset({
 class PromptCueClassifier:
     """Scores a query against all registered query types.
 
-    Implements a cascade strategy: the deterministic pass always runs first.
-    The semantic pass (embedding cosine similarity) fires as a fallback only
-    when the deterministic result is below semantic_fallback_threshold or the
-    top-two candidates are within ambiguity_margin.
+    Implements a semantic-first cascade strategy: the semantic pass always
+    runs when enabled, providing paraphrase-robust scoring.  The deterministic
+    pass is then applied as a correction layer: a strong, specific trigger match
+    (score >= semantic_fallback_threshold AND clear margin) overrides the
+    semantic result.  Weak triggers (below the threshold) do not suppress the
+    semantic path.
+
+    When semantic scoring is disabled (sentence-transformers not installed),
+    the deterministic path runs alone.  This mode is not recommended for
+    production — classification accuracy is significantly lower.
     """
 
     def __init__(self, registry: PromptCueRegistry, config: PromptCueConfig) -> None:
         self.registry          = registry
         self.config            = config
-        self.embedding_backend = PromptCueEmbeddingBackend(model_name=config.embedding_model)
+        self.embedding_backend = PromptCueEmbeddingBackend(
+            model_name=config.embedding_model,
+            cache_dir=config.model_cache_dir,
+        )
         # Cached per-label example embeddings; populated lazily on first semantic classify.
-        self._example_cache: dict[str, list[list[float]]] = {}
+        self._example_cache:   dict[str, list[list[float]]] = {}
+        # Cached per-label negative embeddings; populated alongside _example_cache.
+        self._negative_cache:  dict[str, list[list[float]]] = {}
         self._cache_lock       = threading.Lock()
         # Pre-compiled word-boundary patterns — built once at init, reused on every
         # classify() call.  Prevents false positives from substring containment:
-        # e.g. "validation" inside "invalidation", "generation" inside "degeneration",
-        # "vs" inside "devs", "hey" inside "they".
-        self._label_patterns:   dict[str, re.Pattern[str]]        = self._compile_label_patterns()
+        # e.g. "vs" inside "devs", "hey" inside "they", "assess" inside "reassess".
         self._trigger_patterns: dict[str, list[tuple[str, re.Pattern[str]]]] = (
             self._compile_trigger_patterns()
         )
@@ -82,45 +90,56 @@ class PromptCueClassifier:
     # ==============================================================================
 
     def classify(self, text: str) -> PromptCueClassificationResult:
-        """Cascade classifier — deterministic first, semantic fallback.
+        """Semantic-first cascade classifier.
 
-        The deterministic pass runs unconditionally and is returned immediately
-        when EITHER of the following holds:
-          • semantic scoring is disabled (pure-deterministic mode), OR
-          • the top deterministic score reaches semantic_fallback_threshold AND
-            the gap between top-1 and top-2 meets the ambiguity_margin.
+        When semantic scoring is enabled:
+          1. Semantic path always runs — embedding similarity handles paraphrase
+             variation that trigger phrases cannot cover.
+          2. If semantic scores all types below semantic_similarity_threshold,
+             fall back to deterministic.  This covers domain-specific queries
+             where generic examples give low cosine similarity; a trigger match
+             is more reliable than a below-threshold semantic result.
+          3. When semantic has a result, a STRONG trigger match (score >=
+             semantic_fallback_threshold AND clear margin) overrides it.  Weak
+             trigger matches (one-word phrases that score 0.60–0.74) do not
+             suppress the semantic result.
 
-        Every other case falls through to the semantic pass, which re-scores
-        using sentence-level embeddings and supersedes the deterministic result.
+        When semantic scoring is disabled, the deterministic path runs alone.
         """
         det = self._classify_deterministic(text)
 
         if not self.config.enable_semantic_scoring:
             return det
 
-        top, margin = _top_margin(det.candidates)
+        sem = self._classify_semantic(text)
 
-        high_confidence = (
-            top is not None
-            and top.score >= self.config.semantic_fallback_threshold
-            and margin    >= self.config.ambiguity_margin
+        sem_top, _ = _top_margin(sem.candidates)
+        sem_has_result = (
+            sem_top is not None
+            and sem_top.score >= self.config.semantic_similarity_threshold
         )
-        # A matched trigger phrase is an explicit, intentional signal — trust it
-        # directly when it clears the trigger threshold and the margin is
-        # unambiguous, without letting the semantic path override it.
-        trigger_confident = (
-            top is not None
-            and top.basis == PCUE_BASIS_TRIGGER_MATCH
-            and top.score >= self.config.trigger_fallback_threshold
-            and margin    >= self.config.ambiguity_margin
-        )
-        if high_confidence or trigger_confident:
+        if not sem_has_result:
+            # Semantic cannot classify — fall back to deterministic.
             return det
 
-        return self._classify_semantic(text)
+        top_det, det_margin = _top_margin(det.candidates)
+
+        # Deterministic trigger override: when a trigger phrase fired with a clear
+        # margin, use the trigger result as a correction on the semantic output.
+        # This preserves explicit trigger phrases as reliable intent signals.
+        # The semantic path having already run guarantees semantic scores are
+        # available in candidates even when the trigger path ultimately wins.
+        trigger_override = (
+            top_det is not None
+            and top_det.basis == PCUE_BASIS_TRIGGER_MATCH
+            and top_det.score >= self.config.trigger_fallback_threshold
+            and det_margin    >= self.config.ambiguity_margin
+        )
+
+        return det if trigger_override else sem
 
     def warm_up(self) -> None:
-        """Pre-load the embedding model and pre-compute all example embeddings.
+        """Pre-load the embedding model and pre-compute all example and negative embeddings.
 
         No-op when semantic scoring is disabled — safe to call in all installs.
         """
@@ -132,31 +151,29 @@ class PromptCueClassifier:
     # ==============================================================================
 
     def _classify_deterministic(self, text: str) -> PromptCueClassificationResult:
-        """Score every registered type against *text* using three tiers:
+        """Score every registered type against *text* using two tiers:
 
-        Tier 1 — label_match (0.90):
-            The type label itself appears as a whole word in the query.
-            Word-boundary matching prevents false positives such as "validation"
-            firing inside "invalidation" or "generation" inside "degeneration".
-
-        Tier 2 — trigger_match (0.60–0.91):
+        Tier 1 — trigger_match (0.60–0.91):
             One or more trigger phrases appear as whole words/phrases in the query.
             Word-boundary matching prevents false positives such as "vs" firing
-            inside "devs" or "hey" firing inside "they".
+            inside "devs" or "hey" inside "they".
             Score is proportional to the length of the longest matching trigger:
             short/vague triggers ("how do I") score lower than long/specific ones
             ("how do I configure and deploy"), so overlapping triggers resolve
             to the most specific match rather than a coin-flip tie.
 
-        Tier 3 — word_overlap (0.10–0.50):
+        Tier 2 — word_overlap (0.10–0.50):
             No trigger matched, but query words appear in the type's vocabulary
             (triggers + examples + description).  Provides a graded soft signal
             instead of a flat fallback, making candidate_query_types useful for
             downstream consumers even when no type wins outright.
 
         Floor — fallback (0.10):
-            Zero vocabulary overlap.  Score is the same floor as before but the
-            basis is explicit.
+            Zero vocabulary overlap.
+
+        Note: label_match (formerly Tier 1 at 0.90) was removed.  Type-name words
+        appear in queries for grammatical reasons unrelated to intent — firing at
+        0.90 on incidental vocabulary produced systematic false positives.
         """
         scores:  list[PromptCueCandidate] = []
         lowered: str                 = text.lower()
@@ -165,41 +182,35 @@ class PromptCueClassifier:
         query_words: frozenset[str] = frozenset(w for w in lowered.split() if len(w) > 2)
 
         for definition in self.registry.definitions:
-            label_pat     = self._label_patterns[definition.label]
-            trigger_pats  = self._trigger_patterns[definition.label]
+            trigger_pats = self._trigger_patterns[definition.label]
 
-            if label_pat.search(lowered):
-                score = 0.90
-                basis = PCUE_BASIS_LABEL_MATCH
-
+            matched = [
+                phrase for phrase, pat in trigger_pats
+                if pat.search(lowered) and not self._is_negated(phrase, lowered)
+            ]
+            if matched:
+                # Longest match wins — proxy for trigger specificity.
+                best        = max(matched, key=len)
+                specificity = min(len(best) / 35.0, 1.0)   # normalise; 35 chars ≈ long trigger
+                # Each additional matched trigger adds a small confidence bonus
+                # (+0.03 per extra, capped at +0.06).  Matching both "compare"
+                # and "pros and cons" is a stronger signal than either alone.
+                bonus = min((len(matched) - 1) * 0.03, 0.06)
+                score = round(0.60 + 0.25 * specificity + bonus, 4)
+                basis = PCUE_BASIS_TRIGGER_MATCH
             else:
-                matched = [
-                    phrase for phrase, pat in trigger_pats
-                    if pat.search(lowered) and not self._is_negated(phrase, lowered)
-                ]
-                if matched:
-                    # Longest match wins — proxy for trigger specificity.
-                    best        = max(matched, key=len)
-                    specificity = min(len(best) / 35.0, 1.0)   # normalise; 35 chars ≈ long trigger
-                    # Each additional matched trigger adds a small confidence bonus
-                    # (+0.03 per extra, capped at +0.06).  Matching both "compare"
-                    # and "pros and cons" is a stronger signal than either alone.
-                    bonus = min((len(matched) - 1) * 0.03, 0.06)
-                    score = round(0.60 + 0.25 * specificity + bonus, 4)
-                    basis = PCUE_BASIS_TRIGGER_MATCH
+                # Soft word-overlap fallback across all type vocabulary.
+                type_words = self._type_vocab[definition.label]
+                overlap    = (
+                    len(query_words & type_words) / len(query_words)
+                    if query_words else 0.0
+                )
+                if overlap > 0.0:
+                    score = round(min(0.10 + 0.40 * overlap, 0.50), 4)
+                    basis = PCUE_BASIS_WORD_OVERLAP
                 else:
-                    # Soft word-overlap fallback across all type vocabulary.
-                    type_words = self._type_vocab[definition.label]
-                    overlap    = (
-                        len(query_words & type_words) / len(query_words)
-                        if query_words else 0.0
-                    )
-                    if overlap > 0.0:
-                        score = round(min(0.10 + 0.40 * overlap, 0.50), 4)
-                        basis = PCUE_BASIS_WORD_OVERLAP
-                    else:
-                        score = 0.10
-                        basis = PCUE_BASIS_FALLBACK
+                    score = 0.10
+                    basis = PCUE_BASIS_FALLBACK
 
             scores.append(PromptCueCandidate(label=definition.label, score=score, basis=basis))
 
@@ -215,21 +226,33 @@ class PromptCueClassifier:
 
         Each type's examples are encoded once and cached.  The best (max) cosine
         similarity across a type's example embeddings becomes that type's score.
+        When negative examples are defined, the max similarity against those is
+        multiplied by negative_penalty_weight and subtracted from the raw score,
+        pushing adjacent types apart in embedding space.
         """
         query_vec = self.embedding_backend.encode([text])[0]
-        cache     = self._build_example_cache()
+        self._build_example_cache()
         scores: list[PromptCueCandidate] = []
+        penalty_weight = self.config.negative_penalty_weight
 
         for definition in self.registry.definitions:
-            example_vecs = cache.get(definition.label, [])
+            example_vecs = self._example_cache.get(definition.label, [])
             if not example_vecs:
                 scores.append(PromptCueCandidate(
                     label=definition.label, score=0.0, basis=PCUE_BASIS_FALLBACK,
                 ))
                 continue
 
-            sims    = cosine_similarity_batch(query_vec, example_vecs)
+            sims     = cosine_similarity_batch(query_vec, example_vecs)
             best_sim = max(sims) if sims else 0.0
+
+            # Apply negative example penalty when configured and negatives exist.
+            if penalty_weight > 0.0:
+                neg_vecs = self._negative_cache.get(definition.label, [])
+                if neg_vecs:
+                    neg_sims = cosine_similarity_batch(query_vec, neg_vecs)
+                    best_sim = max(0.0, best_sim - max(neg_sims) * penalty_weight)
+
             scores.append(PromptCueCandidate(
                 label=definition.label,
                 score=round(min(max(best_sim, 0.0), 1.0), 6),
@@ -252,17 +275,6 @@ class PromptCueClassifier:
             return False
         prefix_words = lowered[:idx].split()
         return bool(prefix_words) and prefix_words[-1] in _NEGATION_WORDS
-
-    def _compile_label_patterns(self) -> dict[str, re.Pattern[str]]:
-        """Compile one word-boundary pattern per registered label.
-
-        Using \\b ensures that e.g. "validation" does not match inside
-        "invalidation" and "generation" does not match inside "degeneration".
-        """
-        return {
-            defn.label: re.compile(r'\b' + re.escape(defn.label.lower()) + r'\b')
-            for defn in self.registry.definitions
-        }
 
     def _compile_trigger_patterns(self) -> dict[str, list[tuple[str, re.Pattern[str]]]]:
         """Compile one word-boundary pattern per trigger phrase per type.
@@ -294,22 +306,25 @@ class PromptCueClassifier:
             result[defn.label] = frozenset(w for w in type_text.lower().split() if len(w) > 2)
         return result
 
-    def _build_example_cache(self) -> dict[str, list[list[float]]]:
-        """Build and return the per-label example embedding cache.
+    def _build_example_cache(self) -> None:
+        """Build the per-label example and negative embedding caches.
 
-        Encodes all examples from the registry on first call; subsequent calls
-        return the already-populated cache.  A threading.Lock guards the build
-        path so concurrent first requests do not encode the examples twice.
+        Encodes all examples and negatives from the registry on first call;
+        subsequent calls are no-ops.  A threading.Lock guards the build path
+        so concurrent first requests do not encode the data twice.
         Requires sentence-transformers.
         """
         if self._example_cache:
-            return self._example_cache
+            return
         with self._cache_lock:
             if self._example_cache:
-                return self._example_cache
+                return
             for definition in self.registry.definitions:
                 if definition.examples:
                     self._example_cache[definition.label] = self.embedding_backend.encode(
                         definition.examples
                     )
-        return self._example_cache
+                if definition.negatives:
+                    self._negative_cache[definition.label] = self.embedding_backend.encode(
+                        definition.negatives
+                    )
