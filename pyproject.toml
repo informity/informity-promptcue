@@ -82,9 +82,10 @@ where = ["src"]
 promptcue = ["data/*.yaml", "py.typed"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
-addopts = "-q"
-testpaths = ["tests"]
+pythonpath   = ["src"]
+addopts      = "-q"
+testpaths    = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100

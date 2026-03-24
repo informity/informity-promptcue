@@ -238,7 +238,7 @@ PromptCueAnalyzer(config: PromptCueConfig | None = None)
 | `normalized_text` | `str` | Unicode-normalised, whitespace-collapsed query |
 | `language` | `str` | BCP-47 language code (`"en"`) or `"unknown"` when detection is off |
 | `primary_query_type` | `str` | Top classified query type label, or `"unknown"` |
-| `classification_basis` | `str` | How the result was reached: `label_match`, `trigger_match`, `word_overlap`, `semantic_similarity`, `below_threshold` |
+| `classification_basis` | `str` | How the result was reached: `label_match`, `trigger_match`, `word_overlap`, `fallback`, `semantic_similarity`, `below_threshold` |
 | `candidate_query_types` | `list[PromptCueCandidate]` | All types ranked by score |
 | `confidence` | `float` | Score of the top candidate (0.0–1.0) |
 | `ambiguity_score` | `float` | How close the top-2 candidates are (0.0 = clear, 1.0 = identical) |

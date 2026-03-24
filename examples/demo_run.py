@@ -1,4 +1,4 @@
-# promptcue | Manual test run across all 9 query types
+# promptcue | Manual test run across all 12 query types
 # Maintainer: Informity
 #
 # Run with:
@@ -23,6 +23,12 @@ QUERIES = [
     ('procedure',        'How do I set up a VPC with private subnets step by step?'),
     ('update',           'Any recent updates to the AWS CDK that I should know about?'),
     ('analysis',         'Evaluate this microservices architecture for a multi-region deployment'),
+    ('summarization',
+     'Summarize the key decisions and open questions from the design doc I shared'),
+    ('generation',
+     'Write a concise README introduction for a developer tool that classifies prompts'),
+    ('validation',
+     'I assumed stateless services always scale horizontally — is that actually true?'),
     ('chitchat',         'Hello, how are you doing today?'),
 ]
 
@@ -43,7 +49,7 @@ def main() -> None:
     analyzer.warm_up()  # pre-load all models; avoids latency on first query
 
     print(f'\n{"PromptCue Demo Run":^{WIDTH + 50}}')
-    print(f'{"— all 9 query types, enrichment enabled —":^{WIDTH + 50}}\n')
+    print(f'{"— all 12 query types, enrichment enabled —":^{WIDTH + 50}}\n')
 
     for expected_type, query in QUERIES:
         result = analyzer.analyze(query)
@@ -78,7 +84,7 @@ def main() -> None:
         print()
 
     print(SEP)
-    print(f'\n  {len(QUERIES)} queries tested.\n')
+    print(f'\n  {len(QUERIES)}/12 query types tested.\n')
 
 
 if __name__ == '__main__':
