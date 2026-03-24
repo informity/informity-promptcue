@@ -39,7 +39,7 @@ class PromptCueLanguageDetector:
 
         self._ensure_lib()
         try:
-            from langdetect import detect as _detect
+            from langdetect import detect as _detect  # type: ignore[import-untyped]
             result = _detect(text)
             return result if isinstance(result, str) else PCUE_UNKNOWN
         except Exception:
@@ -58,7 +58,7 @@ class PromptCueLanguageDetector:
             if self._loaded:
                 return
             try:
-                import langdetect  # noqa: F401
+                import langdetect  # noqa: F401  # type: ignore[import-untyped]
                 self._loaded = True
             except ImportError as exc:
                 raise ImportError(

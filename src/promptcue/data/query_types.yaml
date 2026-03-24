@@ -2,7 +2,7 @@
 # Single source of truth for: labels, descriptions, triggers, examples, routing directives,
 # scope, and action hints.
 #
-# triggers     — short phrases for the deterministic classifier (substring matching)
+# triggers     — short phrases for the deterministic classifier (word-boundary regex matching)
 # examples     — full realistic sentences for the semantic classifier (embedding anchors)
 # scope        — query breadth: broad | focused | comparative | exploratory
 # routing_hints keys: needs_retrieval, needs_reasoning, needs_current_info

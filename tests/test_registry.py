@@ -7,7 +7,7 @@ from promptcue.exceptions import PromptCueRegistryError
 def test_registry_loads_defaults() -> None:
     registry    = PromptCueRegistry()
     query_types = registry.get_query_types()
-    assert len(query_types) >= 9
+    assert len(query_types) >= 12
 
 
 def test_registry_contains_expected_labels() -> None:

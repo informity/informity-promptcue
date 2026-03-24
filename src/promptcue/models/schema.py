@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 from promptcue.constants import (
@@ -84,8 +82,8 @@ class PromptCueQueryObject(BaseModel):
     # ==============================================================================
     # Routing and action directives
     # ==============================================================================
-    routing_hints: dict[str, Any] = Field(default_factory=dict)
-    action_hints:  dict[str, Any] = Field(default_factory=dict)
+    routing_hints: dict[str, bool] = Field(default_factory=dict)
+    action_hints:  dict[str, bool] = Field(default_factory=dict)
 
     # ==============================================================================
     # Constraints (reserved — populated in future milestones)
