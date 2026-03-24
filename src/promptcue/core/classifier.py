@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 
 from promptcue.config import PromptCueConfig
@@ -38,6 +39,7 @@ class PromptCueClassifier:
         self.embedding_backend = PromptCueEmbeddingBackend(model_name=config.embedding_model)
         # Cached per-label example embeddings; populated lazily on first semantic classify.
         self._example_cache: dict[str, list[list[float]]] = {}
+        self._cache_lock       = threading.Lock()
 
     # ==============================================================================
     # Public
@@ -67,9 +69,18 @@ class PromptCueClassifier:
         high_confidence = (
             top is not None
             and top.score >= self.config.semantic_fallback_threshold
-            and margin   >= self.config.ambiguity_margin
+            and margin    >= self.config.ambiguity_margin
         )
-        if high_confidence:
+        # A matched trigger phrase is an explicit, intentional signal — trust it
+        # directly when it clears the trigger threshold and the margin is
+        # unambiguous, without letting the semantic path override it.
+        trigger_confident = (
+            top is not None
+            and top.basis == PCUE_BASIS_TRIGGER_MATCH
+            and top.score >= self.config.trigger_fallback_threshold
+            and margin    >= self.config.ambiguity_margin
+        )
+        if high_confidence or trigger_confident:
             return det
 
         return self._classify_semantic(text)
@@ -190,14 +201,18 @@ class PromptCueClassifier:
         """Build and return the per-label example embedding cache.
 
         Encodes all examples from the registry on first call; subsequent calls
-        return the already-populated cache.  Requires sentence-transformers.
+        return the already-populated cache.  A threading.Lock guards the build
+        path so concurrent first requests do not encode the examples twice.
+        Requires sentence-transformers.
         """
         if self._example_cache:
             return self._example_cache
-
-        for definition in self.registry.definitions:
-            if definition.examples:
-                self._example_cache[definition.label] = self.embedding_backend.encode(
-                    definition.examples
-                )
+        with self._cache_lock:
+            if self._example_cache:
+                return self._example_cache
+            for definition in self.registry.definitions:
+                if definition.examples:
+                    self._example_cache[definition.label] = self.embedding_backend.encode(
+                        definition.examples
+                    )
         return self._example_cache

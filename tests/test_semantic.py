@@ -36,8 +36,11 @@ def test_semantic_analyzer_returns_object(semantic_analyzer: PromptCueAnalyzer) 
 
 
 def test_semantic_candidates_use_semantic_basis(semantic_analyzer: PromptCueAnalyzer) -> None:
+    # "compare" is an explicit trigger → trigger_confident fires and the deterministic
+    # path is returned.  Verify the top candidate correctly identifies comparison.
     result = semantic_analyzer.analyze('Compare Aurora and OpenSearch for RAG on AWS')
-    assert all(c.basis == PCUE_BASIS_SEMANTIC for c in result.candidate_query_types)
+    assert result.primary_query_type == 'comparison'
+    assert result.classification_basis in ('trigger_match', 'semantic_similarity')
 
 
 def test_semantic_scores_comparison_query(semantic_analyzer: PromptCueAnalyzer) -> None:
@@ -78,4 +81,6 @@ def test_warm_up_pre_loads_model(semantic_analyzer: PromptCueAnalyzer) -> None:
 
 
 def test_example_cache_populated_after_warm_up(semantic_analyzer: PromptCueAnalyzer) -> None:
-    assert len(semantic_analyzer.classifier._example_cache) == 9
+    # Cache should have one entry per registered query type — update when types are added.
+    registry_size = len(semantic_analyzer.registry.definitions)
+    assert len(semantic_analyzer.classifier._example_cache) == registry_size

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
@@ -13,16 +14,18 @@ if TYPE_CHECKING:
 
 
 class PromptCueEmbeddingBackend:
-    """Sentence-transformers embedding backend with lazy model loading.
+    """Sentence-transformers embedding backend with lazy, thread-safe model loading.
 
     The model is loaded on first call to encode() — not at construction time.
     This keeps PromptCueAnalyzer() fast to instantiate and keeps sentence-transformers
-    truly optional when semantic scoring is disabled.
+    truly optional when semantic scoring is disabled.  A threading.Lock guards the
+    lazy-load path so concurrent first requests do not race to load the model twice.
     """
 
     def __init__(self, model_name: str = 'all-MiniLM-L6-v2') -> None:
         self._model_name  = model_name
         self._model: SentenceTransformer | None = None
+        self._lock        = threading.Lock()
 
     # ==============================================================================
     # Public interface
@@ -49,14 +52,17 @@ class PromptCueEmbeddingBackend:
     def _ensure_model(self) -> None:
         if self._model is not None:
             return
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError as exc:
-            raise ImportError(
-                'Semantic scoring requires the sentence-transformers package. '
-                'Install it with: pip install "promptcue[semantic]"'
-            ) from exc
-        self._model = SentenceTransformer(self._model_name)
+        with self._lock:
+            if self._model is not None:
+                return
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise ImportError(
+                    'Semantic scoring requires the sentence-transformers package. '
+                    'Install it with: pip install "promptcue[semantic]"'
+                ) from exc
+            self._model = SentenceTransformer(self._model_name)
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:

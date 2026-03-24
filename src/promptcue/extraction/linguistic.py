@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
+import threading
+
 from promptcue.models.schema import PromptCueEntity, PromptCueLinguistics
 
 
 class PromptCueLinguisticExtractor:
     """Extracts linguistic features from a query using spaCy.
 
-    The spaCy model is loaded lazily on first extract() call.
+    The spaCy model is loaded lazily on first extract() call.  A threading.Lock
+    guards the load path so concurrent first requests do not race.
     Requires:
         pip install "promptcue[linguistic]"
         python -m spacy download en_core_web_sm
@@ -19,6 +22,7 @@ class PromptCueLinguisticExtractor:
         self.enabled    = enabled
         self.model_name = model_name
         self._nlp       = None
+        self._lock      = threading.Lock()
 
     @property
     def is_loaded(self) -> bool:
@@ -75,19 +79,20 @@ class PromptCueLinguisticExtractor:
         """Load the spaCy model on first use. Raises clear errors for missing deps."""
         if self._nlp is not None:
             return
-
-        try:
-            import spacy
-        except ImportError as exc:
-            raise ImportError(
-                'Linguistic extraction requires spaCy. '
-                'Install it with: pip install "promptcue[linguistic]"'
-            ) from exc
-
-        try:
-            self._nlp = spacy.load(self.model_name)
-        except OSError as exc:
-            raise OSError(
-                f'spaCy model "{self.model_name}" is not installed. '
-                f'Download it with: python -m spacy download {self.model_name}'
-            ) from exc
+        with self._lock:
+            if self._nlp is not None:
+                return
+            try:
+                import spacy
+            except ImportError as exc:
+                raise ImportError(
+                    'Linguistic extraction requires spaCy. '
+                    'Install it with: pip install "promptcue[linguistic]"'
+                ) from exc
+            try:
+                self._nlp = spacy.load(self.model_name)
+            except OSError as exc:
+                raise OSError(
+                    f'spaCy model "{self.model_name}" is not installed. '
+                    f'Download it with: python -m spacy download {self.model_name}'
+                ) from exc

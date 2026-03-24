@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from promptcue.config import PromptCueConfig
 from promptcue.constants import PCUE_BASIS_SEMANTIC, PCUE_DEFAULT_REGISTRY, PCUE_SCHEMA_VERSION
 from promptcue.core.classifier import PromptCueClassifier
@@ -54,6 +56,25 @@ class PromptCueAnalyzer:
         self.classifier.warm_up()
         self.linguistic_extractor.warm_up()
         self.keyword_extractor.warm_up()
+
+    async def warm_up_async(self) -> None:
+        """Async equivalent of warm_up() — safe to await from any async startup handler.
+
+        Runs warm_up() in a thread-pool executor so the event loop is not
+        blocked while models are loading (~10–15 s on first run, ~1–2 s
+        when models are cached locally).
+        """
+        await asyncio.to_thread(self.warm_up)
+
+    async def analyze_async(self, text: str) -> PromptCueQueryObject:
+        """Async equivalent of analyze() — safe to await from any async context.
+
+        Runs analyze() in a thread-pool executor so ML inference does not
+        block the event loop.  Models must be loaded before calling this
+        (call warm_up_async() at startup) otherwise the first request will
+        pay the full model-load cost inside the executor.
+        """
+        return await asyncio.to_thread(self.analyze, text)
 
     def analyze(self, text: str) -> PromptCueQueryObject:
         """Analyze a natural-language query and return a structured PromptCueQueryObject."""

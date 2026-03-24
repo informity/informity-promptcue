@@ -1,3 +1,7 @@
+import asyncio
+
+import pytest
+
 from promptcue import PromptCueAnalyzer
 from promptcue.constants import (
     PCUE_BASIS_BELOW_THRESHOLD,
@@ -11,7 +15,8 @@ from promptcue.constants import (
 
 _KNOWN_TYPES = {
     'coverage', 'lookup', 'comparison', 'recommendation', 'troubleshooting',
-    'procedure', 'analysis', 'update', 'chitchat', 'unknown',
+    'procedure', 'analysis', 'update', 'summarization', 'generation',
+    'validation', 'chitchat', 'unknown',
 }
 # Cascade classifier may produce deterministic or semantic basis depending on
 # which path fires — both are valid for these general tests.
@@ -52,3 +57,25 @@ def test_routing_hints_keys_present() -> None:
     assert 'needs_retrieval'     in result.routing_hints
     assert 'needs_reasoning'     in result.routing_hints
     assert 'needs_current_info'  in result.routing_hints
+
+
+# ==============================================================================
+# Async interface
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_analyze_async_returns_same_result() -> None:
+    analyzer    = PromptCueAnalyzer()
+    sync_result  = analyzer.analyze('compare aurora and opensearch for rag')
+    async_result = await analyzer.analyze_async('compare aurora and opensearch for rag')
+    assert async_result.primary_query_type == sync_result.primary_query_type
+    assert async_result.input_text         == sync_result.input_text
+
+
+@pytest.mark.asyncio
+async def test_warm_up_async_completes() -> None:
+    analyzer = PromptCueAnalyzer()
+    await analyzer.warm_up_async()
+    # After async warm-up, a subsequent analyze call must complete without loading
+    result = await analyzer.analyze_async('what is machine learning')
+    assert result.primary_query_type != ''

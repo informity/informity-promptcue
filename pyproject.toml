@@ -55,10 +55,6 @@ linguistic = [
 keywords = [
   "keybert>=0.7,<1",
 ]
-api = [
-  "fastapi>=0.100,<1",
-  "uvicorn>=0.20,<1",
-]
 dev = [
   "build>=1.0,<2",
   "pytest>=7.0,<10",
@@ -71,8 +67,6 @@ all = [
   "langdetect>=1.0.9,<2",
   "spacy>=3.7,<4",
   "keybert>=0.7,<1",
-  "fastapi>=0.100,<1",
-  "uvicorn>=0.20,<1",
 ]
 
 [tool.setuptools]

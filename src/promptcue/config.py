@@ -45,11 +45,16 @@ class PromptCueConfig(BaseModel):
     # The deterministic pass runs first; semantic is invoked only when the
     # deterministic confidence is below semantic_fallback_threshold or the
     # top-two candidates are too close (< ambiguity_margin apart).
+    # Exception: when a trigger phrase matched AND the top score meets
+    # trigger_fallback_threshold AND the margin is clear, the deterministic
+    # result is trusted directly and semantic is skipped — explicit trigger
+    # phrases are strong signals that should not be overridden by embeddings.
     # Downloads model from HuggingFace Hub on first use (~90 MB for the default).
     # Model is cached locally after first download.
     # ==============================================================================
-    enable_semantic_scoring: bool = Field(default_factory=_semantic_available)
-    embedding_model:         str  = Field(default='all-MiniLM-L6-v2')
+    enable_semantic_scoring:    bool  = Field(default_factory=_semantic_available)
+    embedding_model:            str   = Field(default='all-MiniLM-L6-v2')
+    trigger_fallback_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
 
     # ==============================================================================
     # Language detection

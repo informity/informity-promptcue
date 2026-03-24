@@ -24,16 +24,20 @@ query_types:
       - what should we know about
       - explain the big picture
       - big picture
-      - summarize everything
       - broad overview
+      - all about
+      - full picture
     examples:
       - give me an overview of this topic
-      - tell me everything you know about this
-      - cover the basics and give me a broad summary
-      - what should I know about this subject
-      - explain the big picture and all the key concepts
-      - summarize the entire landscape for me
-      - explain the complete picture of this technology including all its components and how they work together
+      - tell me everything you know about this subject
+      - cover the basics and give me a broad overview of the subject
+      - what should I know about this area before diving in
+      - explain the big picture and all the key concepts involved
+      - walk me through the whole landscape of this field at a high level
+      - explain everything about this from first principles to advanced usage
+      - I want a complete high-level understanding of this topic end to end
+      - give me a comprehensive overview covering all the major aspects of this
+      - what are all the important things to know about this subject
     routing_hints:
       needs_retrieval:    true
       needs_reasoning:    false
@@ -54,16 +58,25 @@ query_types:
       - what is
       - who is
       - where is
+      - when did
+      - when was
+      - who created
+      - who invented
       - define
       - what does
       - how many
     examples:
       - define this term or concept for me
-      - what does this acronym or abbreviation mean
-      - what is the exact documented value for this setting
-      - where exactly is this option or parameter configured
-      - what is the specific limit or quota for this
-      - I need the precise specification or default for this field
+      - what does this word or phrase mean
+      - what is the accepted or standard value for this
+      - where exactly does this happen or get configured
+      - how many of these exist in total
+      - who created or first introduced this concept
+      - when did this happen or when was this first released
+      - what is the name of the thing responsible for this behaviour
+      - what does this abbreviation or acronym stand for
+      - what is the precise meaning of this term in this context
+      - who invented this and when did it first appear
     routing_hints:
       needs_retrieval:    true
       needs_reasoning:    false
@@ -84,16 +97,23 @@ query_types:
       - compare
       - difference between
       - versus
+      - vs
       - how does differ from
       - pros and cons
       - similarities between
+      - how do they differ
+      - what sets apart
     examples:
       - compare these two options and explain the differences
-      - what is the difference between these two services
-      - how does one option differ from the other
-      - what are the pros and cons of each approach
-      - show me a side by side comparison of these alternatives
+      - what is the difference between these two things
+      - how does one approach differ from the other
+      - what are the pros and cons of each option
+      - show me a side by side comparison of these two alternatives
       - what are the similarities and differences between these two
+      - how do these two things differ in terms of behaviour and trade-offs
+      - lay out the key distinctions between these two approaches for me
+      - what distinguishes one from the other and where do they overlap
+      - compare these two and tell me where each one is stronger or weaker
     routing_hints:
       needs_retrieval:    true
       needs_reasoning:    true
@@ -125,11 +145,15 @@ query_types:
       - which option should I use for my use case
       - what would you recommend for this situation
       - help me decide which one to choose
-      - what is the best approach for my requirements
+      - what is the best approach given my requirements
       - should I go with this option or the other one
       - what do you suggest I use for this problem
+      - tell me which one to pick and why
+      - I need you to make a recommendation based on my constraints
+      - given everything I described what is the right choice here
+      - what is the single best option for what I am trying to do
     routing_hints:
-      needs_retrieval:    false
+      needs_retrieval:    true
       needs_reasoning:    true
       needs_current_info: false
     action_hints:
@@ -148,17 +172,26 @@ query_types:
       - why is this failing
       - how do I fix
       - what is wrong with
-      - why is not working
+      - not working
+      - isn't working
+      - doesn't work
+      - broken
+      - failed to
+      - keeps crashing
       - error when
       - how do I resolve
     examples:
       - why is this failing and how do I fix it
-      - my service is throwing an error and I cannot figure out why
+      - something is throwing an error and I cannot figure out why
       - how do I resolve this issue that keeps happening
-      - what is wrong with my configuration
-      - I am getting an unexpected error when doing this
+      - what is wrong with my setup
+      - I am getting an unexpected error when I try to do this
       - how do I debug and fix this problem
-      - my service keeps timing out or failing under high load, what is causing this and how do I fix it
+      - this keeps crashing or failing unexpectedly and I need to understand why
+      - it was working before and now it is broken — what changed
+      - I cannot get past this error no matter what I try
+      - the output is wrong and I need to figure out what is causing it
+      - things stop working under certain conditions and I need to diagnose the root cause
     routing_hints:
       needs_retrieval:    true
       needs_reasoning:    true
@@ -185,11 +218,14 @@ query_types:
     examples:
       - how do I set this up step by step
       - walk me through the process of doing this
-      - what are the steps to configure and deploy this
-      - guide me through setting this up from scratch
+      - what are the steps to complete this task
+      - guide me through setting this up from the beginning
       - how do I install and configure this correctly
-      - what is the procedure for doing this task
-      - how do I configure and set up the required permissions and access controls step by step
+      - what is the procedure for doing this
+      - give me a step by step guide to getting this working
+      - I need instructions for how to do this from start to finish
+      - take me through the whole process one step at a time
+      - what do I need to do in order to get this set up and running
     routing_hints:
       needs_retrieval:    true
       needs_reasoning:    true
@@ -213,19 +249,26 @@ query_types:
       - what do you think about
       - is this a good
       - review this
+      - what are the trade-offs
+      - trade-offs of
     examples:
-      - analyze this approach and tell me if it is a good idea
+      - analyze this approach and tell me if it is sound
       - evaluate the strengths and weaknesses of this design
-      - what do you think about this architecture or solution
-      - assess whether this is a good approach for production
-      - review this implementation and give me your opinion
-      - is this the right way to solve this kind of problem
+      - what do you think about this idea — is it worth pursuing
+      - assess whether this is a sensible way to handle this
+      - review this plan and give me your honest opinion
+      - is this the right way to approach this kind of problem
+      - what are the trade-offs of doing it this way
+      - give me a critical assessment of this decision or approach
+      - tell me what the downsides and risks of this approach are
+      - I want your expert opinion on whether this is a good idea
+      - analyse this and point out any flaws or blind spots
     routing_hints:
       needs_retrieval:    false
       needs_reasoning:    true
       needs_current_info: false
     action_hints:
-      should_survey:                    true
+      should_survey:                    false
       should_enumerate:                 false
       should_compare:                   false
       should_direct_answer:             false
@@ -243,13 +286,19 @@ query_types:
       - what is new in
       - latest version of
       - any recent updates
+      - what changed in
+      - recently released
     examples:
-      - what is the latest version or most recent release of this
-      - what has changed in the newest version of this product
+      - what is the latest or most recent version of this
+      - what has changed in the newest release
       - are there any recent announcements or news about this
-      - what new features were added in the latest release
+      - what new features or improvements were added recently
       - have there been any recent breaking changes I should know about
-      - what changed between the old version and the new version
+      - what changed between the previous version and the current one
+      - what is new in the most recent release and should I upgrade
+      - I need to know what has been updated or changed lately
+      - what are the most recent developments or additions to this
+      - has anything important changed in the last release cycle
     routing_hints:
       needs_retrieval:    true
       needs_reasoning:    false
@@ -263,16 +312,152 @@ query_types:
       should_clarify:                   false
       should_respond_conversationally:  false
 
+  - label: summarization
+    description: Request to condense specific existing content — provided, referenced, or already exchanged — into a shorter form.
+    scope: focused
+    triggers:
+      - summarize this
+      - summarize the following
+      - give me a summary of
+      - tl;dr
+      - tldr
+      - key points of
+      - key takeaways from
+      - boil this down
+      - condense this
+      - shorten this
+      - what were the main points
+    examples:
+      - summarize what was just shared or discussed
+      - give me a summary of the content I just provided
+      - what are the key points or main takeaways from this text
+      - tl;dr — what is the short version of what I just shared
+      - condense the above into the most important ideas only
+      - boil down what was said into a few bullet points
+      - I have a long piece of content here — give me a short version
+      - extract the key decisions and conclusions from what I shared
+      - summarize the following passage in two or three sentences
+      - what were the main points made in that discussion or document
+      - take everything above and distil it into the essential points
+    routing_hints:
+      needs_retrieval:    false
+      needs_reasoning:    true
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 false
+      should_compare:                   false
+      should_direct_answer:             true
+      should_check_recency:             false
+      should_clarify:                   false
+      should_respond_conversationally:  false
+
+  - label: generation
+    description: Request to produce or create entirely new content — text, templates, drafts, or other artifacts — from scratch with no existing source to condense.
+    scope: focused
+    triggers:
+      - write me
+      - write a
+      - write an
+      - draft a
+      - draft me
+      - draft an
+      - generate a
+      - generate an
+      - make me a
+      - give me a template
+      - produce a
+      - compose a
+    examples:
+      - write me a short paragraph or piece of text on this topic from scratch
+      - write me an original message or email on this subject
+      - draft a new template I can use for this purpose
+      - generate an original example of what this should look like
+      - make me a reusable blank template I can fill in and customise
+      - write a fresh announcement or description I can publish as-is
+      - compose an original reply or message I can send to someone
+      - produce a working example of this pattern written from scratch
+      - I need you to write something entirely new for me on this subject
+      - draft a new piece of writing for me that does not exist yet
+      - write the opening blurb or documentation section for this project from scratch
+      - generate original written content for me — there is no source material to condense
+    routing_hints:
+      needs_retrieval:    false
+      needs_reasoning:    true
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 false
+      should_compare:                   false
+      should_direct_answer:             true
+      should_check_recency:             false
+      should_clarify:                   true
+      should_respond_conversationally:  false
+
+  - label: validation
+    description: Request to verify or fact-check a specific stated claim, assumption, or belief. The user asserts something and wants to know if it is factually correct.
+    scope: focused
+    triggers:
+      - is this correct
+      - is it correct that
+      - is it true that
+      - can you confirm
+      - verify that
+      - is this accurate
+      - is that accurate
+      - am I right that
+      - am I correct that
+      - is this valid
+      - fact check
+      - is that true
+      - confirm whether
+      - does it make sense to
+      - is it accurate that
+    examples:
+      - is this claim factually correct or am I wrong about this
+      - can you verify whether what I just stated is actually true
+      - I believe this is how it works — can you confirm or correct me
+      - fact check this for me — is it true that this is how it behaves
+      - am I right that this is what actually happens in this situation
+      - I want to verify this assumption before I rely on it — is it accurate
+      - is the statement I just made correct or is there a flaw in it
+      - tell me if this belief or understanding is factually right or wrong
+      - I have been told this is how it works — is that accurate
+      - confirm whether my understanding of this fact is correct
+      - I think I know the answer but I want you to verify it for me
+    routing_hints:
+      needs_retrieval:    true
+      needs_reasoning:    true
+      needs_current_info: false
+    action_hints:
+      should_survey:                    false
+      should_enumerate:                 false
+      should_compare:                   false
+      should_direct_answer:             true
+      should_check_recency:             false
+      should_clarify:                   false
+      should_respond_conversationally:  false
+
   - label: chitchat
     description: Conversational, off-topic, or social exchange with no information need.
     scope: broad
     triggers:
       - hello
       - hi there
+      - hey
+      - good morning
+      - good afternoon
+      - good evening
       - thank you
       - thanks for
+      - thanks
+      - cheers
       - how are you
       - goodbye
+      - got it
+      - ok thanks
+      - great thanks
+      - awesome
     examples:
       - hello how are you doing today
       - thanks that was really helpful
@@ -280,6 +465,11 @@ query_types:
       - thank you so much for your help
       - goodbye talk to you later
       - that is great I appreciate it
+      - hey just wanted to say thanks
+      - got it thanks for clarifying
+      - ok great that makes sense now
+      - cheers I appreciate the help
+      - no problem just checking in
     routing_hints:
       needs_retrieval:    false
       needs_reasoning:    false

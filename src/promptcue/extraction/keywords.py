@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
+import threading
+
 from promptcue.models.schema import PromptCueKeyword
 
 
 class PromptCueKeywordExtractor:
     """Extracts keywords and keyphrases from a query using KeyBERT.
 
-    KeyBERT is loaded lazily on the first extract() call.
+    KeyBERT is loaded lazily on the first extract() call.  A threading.Lock
+    guards the load path so concurrent first requests do not race.
     Requires: pip install "promptcue[keywords]"
 
     KeyBERT uses a sentence-transformer model internally — by default the same
@@ -21,6 +24,7 @@ class PromptCueKeywordExtractor:
         self.enabled      = enabled
         self.max_keywords = max_keywords
         self._kw_model    = None
+        self._lock        = threading.Lock()
 
     @property
     def is_loaded(self) -> bool:
@@ -63,13 +67,14 @@ class PromptCueKeywordExtractor:
         """Initialise KeyBERT on first use. Raises a clear error for missing dep."""
         if self._kw_model is not None:
             return
-
-        try:
-            from keybert import KeyBERT
-        except ImportError as exc:
-            raise ImportError(
-                'Keyword extraction requires KeyBERT. '
-                'Install it with: pip install "promptcue[keywords]"'
-            ) from exc
-
-        self._kw_model = KeyBERT()
+        with self._lock:
+            if self._kw_model is not None:
+                return
+            try:
+                from keybert import KeyBERT
+            except ImportError as exc:
+                raise ImportError(
+                    'Keyword extraction requires KeyBERT. '
+                    'Install it with: pip install "promptcue[keywords]"'
+                ) from exc
+            self._kw_model = KeyBERT()
