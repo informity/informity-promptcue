@@ -121,6 +121,10 @@ For standalone mode, every deployment must:
 2. Pre-download the model **before** the service starts — not on first query.
 3. Call `warm_up()` (or `warm_up_async()`) at startup and gate readiness on it succeeding.
 
+Progress bars from `sentence-transformers` are disabled by default in standalone mode
+(`show_progress_bar=False`) so server logs stay clean. Set
+`PromptCueConfig(show_progress_bar=True)` only when you explicitly want tqdm batch output.
+
 If the model cannot be loaded, PromptCue raises `PromptCueModelLoadError` immediately.
 It never silently falls back to deterministic-only mode — a misconfigured deployment
 fails loudly at startup rather than producing quietly wrong results at query time.
@@ -401,6 +405,7 @@ PromptCueAnalyzer(config: PromptCueConfig | None = None)
 | `registry_path` | `Path \| None` | `None` | Custom YAML registry path; uses bundled default when `None` |
 | `model_cache_dir` | `Path \| None` | env / `None` | Directory where the sentence-transformers model is cached. Falls back to `PROMPTCUE_MODEL_CACHE` env var, then HuggingFace default (`~/.cache/huggingface/`) |
 | `embed_fn` | `Callable[[str], list[float]] \| None` | `None` | Injectable embed function for hosted mode. When set, PromptCue delegates all vector computation to this function and never loads a model. `enable_semantic_scoring` is forced to `True`. See [Hosted mode](#hosted-mode-reusing-an-existing-embedding-model) |
+| `show_progress_bar` | `bool` | `False` | Standalone mode only: forwarded to `SentenceTransformer.encode(show_progress_bar=...)`. Keep `False` for clean logs; set `True` for local debugging |
 | `similarity_threshold` | `float` | `0.55` | Minimum score for a deterministic match to be accepted |
 | `semantic_similarity_threshold` | `float` | `0.20` | Minimum score for a semantic match to be accepted |
 | `ambiguity_margin` | `float` | `0.08` | Min gap between top-2 scores before clarification is flagged |

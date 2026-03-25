@@ -38,6 +38,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `PCUE_HINT_TEMPORAL = 'has_temporal_scope'` constant added to `constants.py`
 - 25 new tests in `tests/test_core.py::TestTemporalScope` covering True/False detector cases
   and end-to-end routing_hints key presence
+- `PromptCueConfig.show_progress_bar: bool` (default `False`) — standalone-mode control
+  for `SentenceTransformer.encode(show_progress_bar=...)`; keeps batch tqdm output disabled
+  by default for clean server logs, with explicit opt-in for local debugging
+- 2 new tests in `tests/test_core.py::TestEmbeddingBackend` verifying `show_progress_bar`
+  forwarding (`False` default and `True` opt-in) on standalone embedding calls
+
+---
+
+## [0.2.1] — 2026-03-25
+
+### Added
+
+- `PromptCueConfig.show_progress_bar: bool` (default `False`) to control standalone
+  sentence-transformers batch progress output
+- README documentation for `show_progress_bar` in production deployment guidance and
+  the `PromptCueConfig` fields table
+- standalone tests verifying `show_progress_bar` forwarding in `PromptCueEmbeddingBackend`
+
+### Changed
+
+- standalone semantic embedding calls now pass `show_progress_bar` explicitly to
+  `SentenceTransformer.encode(...)` (silent by default)
 
 ---
 

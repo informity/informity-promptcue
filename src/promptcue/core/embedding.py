@@ -42,10 +42,12 @@ class PromptCueEmbeddingBackend:
         model_name: str       = 'all-MiniLM-L6-v2',
         cache_dir:  Path | None = None,
         embed_fn:   Callable[[str], list[float]] | None = None,
+        show_progress_bar: bool = False,
     ) -> None:
         self._model_name  = model_name
         self._cache_dir   = cache_dir
         self._embed_fn    = embed_fn
+        self._show_progress_bar = show_progress_bar
         self._model: SentenceTransformer | None = None
         self._lock        = threading.Lock()
 
@@ -67,7 +69,11 @@ class PromptCueEmbeddingBackend:
         if self._embed_fn is not None:
             return [self._embed_fn(text) for text in texts_list]
         self._ensure_model()
-        embeddings = self._model.encode(texts_list, convert_to_numpy=True)  # type: ignore[union-attr]
+        embeddings = self._model.encode(
+            texts_list,
+            convert_to_numpy=True,
+            show_progress_bar=self._show_progress_bar,
+        )  # type: ignore[union-attr]
         return embeddings.tolist()
 
     def warm_up(self) -> None:

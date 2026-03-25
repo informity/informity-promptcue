@@ -105,6 +105,7 @@ class PromptCueConfig(BaseModel):
     embed_fn:                   PromptCueEmbedFn | None = Field(default=None)
     enable_semantic_scoring:    bool  = Field(default_factory=_semantic_available)
     embedding_model:            str   = Field(default='all-MiniLM-L6-v2')
+    show_progress_bar:          bool  = Field(default=False)
     trigger_fallback_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
     # Penalty subtracted from each type's semantic score per the max cosine
     # similarity with that type's negative examples.  0.0 disables the penalty.

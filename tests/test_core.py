@@ -138,6 +138,32 @@ class TestEmbeddingBackend:
         ):
             backend.warm_up()
 
+    def test_encode_passes_show_progress_bar_false_by_default(self) -> None:
+        backend = PromptCueEmbeddingBackend()
+        backend._model = MagicMock()
+        backend._model.encode.return_value.tolist.return_value = [[0.0, 1.0]]
+
+        backend.encode(['hello'])
+
+        backend._model.encode.assert_called_once_with(
+            ['hello'],
+            convert_to_numpy=True,
+            show_progress_bar=False,
+        )
+
+    def test_encode_passes_show_progress_bar_true_when_enabled(self) -> None:
+        backend = PromptCueEmbeddingBackend(show_progress_bar=True)
+        backend._model = MagicMock()
+        backend._model.encode.return_value.tolist.return_value = [[0.0, 1.0]]
+
+        backend.encode(['hello'])
+
+        backend._model.encode.assert_called_once_with(
+            ['hello'],
+            convert_to_numpy=True,
+            show_progress_bar=True,
+        )
+
 
 # ==============================================================================
 # DecisionEngine
