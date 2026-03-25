@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)"
-            srcset="https://api.iconify.design/ri/search-ai-3-line.svg?color=%23ffffff&width=72&height=72" />
+            srcset="https://api.iconify.design/ri/search-ai-3-line.svg?color=%23e6edf3&width=72&height=72" />
     <img src="https://api.iconify.design/ri/search-ai-3-line.svg?color=%23222222&width=72&height=72" alt="" />
   </picture>
 </p>
