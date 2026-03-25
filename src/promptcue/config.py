@@ -4,9 +4,16 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+# Type alias for an injectable single-text embed function.
+# Accepts a string, returns a flat float vector.  Any callable with this
+# signature can be passed to PromptCueConfig(embed_fn=...) to share an
+# already-loaded embedding model with promptcue (hosted mode).
+PromptCueEmbedFn = Callable[[str], list[float]]
 
 
 def _semantic_available() -> bool:
@@ -26,6 +33,8 @@ def _default_model_cache_dir() -> Path | None:
 
 class PromptCueConfig(BaseModel):
     """Top-level runtime configuration for PromptCueAnalyzer."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # ==============================================================================
     # Registry
@@ -81,7 +90,19 @@ class PromptCueConfig(BaseModel):
     # trigger fires at >= trigger_fallback_threshold AND the top-two deterministic
     # scores differ by >= ambiguity_margin, the trigger result overrides semantic.
     # Model is pre-downloaded to model_cache_dir (or HuggingFace default cache).
+    #
+    # Hosted mode (embed_fn):
+    #   When embed_fn is provided, promptcue delegates all encoding to the caller's
+    #   function and never loads a model.  enable_semantic_scoring defaults to True
+    #   when embed_fn is set.  warm_up() becomes a no-op.  Use this when the
+    #   application already has an embedding model loaded (e.g. for RAG) and wants
+    #   to share it with promptcue rather than loading a second model.
+    #
+    #   Example:
+    #     config = PromptCueConfig(embed_fn=my_embedder.encode_query)
+    #     analyzer = PromptCueAnalyzer(config)  # no model loaded by promptcue
     # ==============================================================================
+    embed_fn:                   PromptCueEmbedFn | None = Field(default=None)
     enable_semantic_scoring:    bool  = Field(default_factory=_semantic_available)
     embedding_model:            str   = Field(default='all-MiniLM-L6-v2')
     trigger_fallback_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
@@ -110,6 +131,15 @@ class PromptCueConfig(BaseModel):
     # ==============================================================================
     # Named calibration presets
     # ==============================================================================
+
+    @model_validator(mode='after')
+    def _resolve_embed_fn(self) -> PromptCueConfig:
+        # When an external embed_fn is supplied, the caller already owns a loaded
+        # model.  Force-enable semantic scoring so the classification path runs even
+        # when sentence-transformers is not installed in this environment.
+        if self.embed_fn is not None:
+            self.enable_semantic_scoring = True
+        return self
 
     @classmethod
     def strict(cls) -> PromptCueConfig:

@@ -11,6 +11,7 @@ from promptcue.constants import (
     PCUE_BASIS_SEMANTIC,
     PCUE_DEFAULT_REGISTRY,
     PCUE_HINT_STRUCTURE,
+    PCUE_HINT_TEMPORAL,
     PCUE_SCHEMA_VERSION,
 )
 from promptcue.core.classifier import PromptCueClassifier
@@ -77,6 +78,55 @@ def _detect_needs_structure(text: str) -> bool:
     format, which downstream generators should respect.
     """
     return any(pat.search(text) for pat in _STRUCTURE_PATTERNS)
+
+
+# Patterns indicating the query has a temporal scope — references a specific time
+# period, a year-over-year comparison, or a temporal aggregation.  Pure regex,
+# no model dependency; runs before classification.
+#
+# Scope: generic signals any time-aware application can act on.
+# Corpus-specific interpretations (e.g. aggregate_by_period, group_by='year')
+# are the caller's responsibility and must stay in the consuming application.
+_TEMPORAL_SCOPE_PATTERNS: list[re.Pattern[str]] = [
+    # Specific 4-digit year reference (1900–2099)
+    re.compile(r'\b(?:19|20)\d{2}\b'),
+    # Year-over-year and multi-year aggregation phrases
+    re.compile(r'\byear[-\s]*(?:by|over)[-\s]*year\b',   re.IGNORECASE),
+    re.compile(r'\bcross[-\s]*year\b',                    re.IGNORECASE),
+    re.compile(r'\bby\s+year\b',                          re.IGNORECASE),
+    re.compile(r'\byears?\s+covered\b',                   re.IGNORECASE),
+    re.compile(r'\byear[-\s]*to[-\s]*date\b',             re.IGNORECASE),
+    re.compile(r'\bYTD\b'),
+    # Duration phrases: "over/in/for the last/past N years"
+    re.compile(
+        r'\b(?:over|in|for)\s+the\s+(?:last|past)\s+\d+\s+years?\b', re.IGNORECASE,
+    ),
+    # Explicit year ranges: "from 2020 to 2023", "between 2018 and 2022"
+    re.compile(r'\bfrom\s+(?:19|20)\d{2}\s+to\s+(?:19|20)\d{2}\b',        re.IGNORECASE),
+    re.compile(r'\bbetween\s+(?:19|20)\d{2}\s+and\s+(?:19|20)\d{2}\b',    re.IGNORECASE),
+    # "since 2020", "starting from 2019"
+    re.compile(r'\bsince\s+(?:19|20)\d{2}\b',         re.IGNORECASE),
+    re.compile(r'\bstarting\s+(?:from\s+)?(?:19|20)\d{2}\b', re.IGNORECASE),
+    # Periodic trend phrases
+    re.compile(r'\b(?:quarterly|annual|monthly)\s+trend\b', re.IGNORECASE),
+    re.compile(r'\bover\s+time\b',                          re.IGNORECASE),
+    # Quarter references: "Q1 2023", "2023 Q4"
+    re.compile(r'\bQ[1-4]\s+(?:19|20)\d{2}\b'),
+    re.compile(r'\b(?:19|20)\d{2}\s+Q[1-4]\b'),
+]
+
+
+def _detect_temporal_scope(text: str) -> bool:
+    """Return True when text references a specific time period or temporal aggregation.
+
+    Covers year references (2020, 2021...), year-over-year phrases, multi-year
+    duration phrases ("over the last 3 years"), year ranges, and periodic trend
+    phrases.  Pure regex — no model dependency.
+
+    Populates routing_hints['has_temporal_scope'] so that any time-aware
+    application can act on the signal without re-implementing the detection.
+    """
+    return any(pat.search(text) for pat in _TEMPORAL_SCOPE_PATTERNS)
 
 
 class PromptCueAnalyzer:
@@ -146,8 +196,9 @@ class PromptCueAnalyzer:
         language       = self.language_detector.detect(normalized)
 
         # Pre-classification structural signals — pure regex, no model dependency.
-        is_continuation = _detect_continuation(normalized)
-        needs_structure = _detect_needs_structure(text)   # use raw text for Markdown patterns
+        is_continuation  = _detect_continuation(normalized)
+        needs_structure  = _detect_needs_structure(text)   # use raw text for Markdown patterns
+        temporal_scope   = _detect_temporal_scope(normalized)
 
         classification = self.classifier.classify(normalized)
 
@@ -166,7 +217,11 @@ class PromptCueAnalyzer:
         keywords   = self.keyword_extractor.extract(normalized)
 
         # Merge computed routing hints on top of YAML-derived hints from the decision engine.
-        routing_hints = {**decision.routing_hints, PCUE_HINT_STRUCTURE: needs_structure}
+        routing_hints = {
+            **decision.routing_hints,
+            PCUE_HINT_STRUCTURE: needs_structure,
+            PCUE_HINT_TEMPORAL:  temporal_scope,
+        }
 
         return PromptCueQueryObject(
             schema_version         = PCUE_SCHEMA_VERSION,

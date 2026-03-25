@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,24 +19,33 @@ if TYPE_CHECKING:
 class PromptCueEmbeddingBackend:
     """Sentence-transformers embedding backend with lazy, thread-safe model loading.
 
-    The model is loaded on first call to encode() — not at construction time.
-    This keeps PromptCueAnalyzer() fast to instantiate and keeps sentence-transformers
-    truly optional when semantic scoring is disabled.  A threading.Lock guards the
-    lazy-load path so concurrent first requests do not race to load the model twice.
+    Two operating modes:
 
-    If the model cannot be loaded (missing cache, no network, bad path), a
-    PromptCueModelLoadError is raised immediately.  PromptCue does not degrade to
-    deterministic-only mode — that path produces ~40–50% accuracy and is not a
-    supported production configuration.
+    Standalone (default):
+        The sentence-transformers model is loaded lazily on first encode() call.
+        Pass model_name / cache_dir to control which model is used.
+
+    Hosted (embed_fn provided):
+        No model is loaded by promptcue.  All encoding is delegated to the
+        caller-supplied function.  Use this when the application already has an
+        embedding model loaded (e.g. for RAG) and wants to reuse it here.
+        warm_up() is a no-op; is_loaded is always True.
+
+    In standalone mode: if the model cannot be loaded (missing cache, no network,
+    bad path), PromptCueModelLoadError is raised immediately.  PromptCue does not
+    degrade to deterministic-only mode — that path produces ~40–50% accuracy and
+    is not a supported production configuration.
     """
 
     def __init__(
         self,
         model_name: str       = 'all-MiniLM-L6-v2',
         cache_dir:  Path | None = None,
+        embed_fn:   Callable[[str], list[float]] | None = None,
     ) -> None:
         self._model_name  = model_name
         self._cache_dir   = cache_dir
+        self._embed_fn    = embed_fn
         self._model: SentenceTransformer | None = None
         self._lock        = threading.Lock()
 
@@ -46,13 +55,17 @@ class PromptCueEmbeddingBackend:
 
     @property
     def is_loaded(self) -> bool:
-        return self._model is not None
+        # When using an injected embed_fn, no model is loaded by promptcue;
+        # the backend is always ready.
+        return self._embed_fn is not None or self._model is not None
 
     def encode(self, texts: Iterable[str]) -> list[list[float]]:
         """Encode texts and return a list of float vectors."""
         texts_list = list(texts)
         if not texts_list:
             return []
+        if self._embed_fn is not None:
+            return [self._embed_fn(text) for text in texts_list]
         self._ensure_model()
         embeddings = self._model.encode(texts_list, convert_to_numpy=True)  # type: ignore[union-attr]
         return embeddings.tolist()
@@ -60,12 +73,17 @@ class PromptCueEmbeddingBackend:
     def warm_up(self) -> None:
         """Pre-load the sentence-transformer model explicitly.
 
+        No-op when embed_fn was provided — the external model is already owned
+        by the caller and does not need to be loaded here.
+
         This method exists for consumers who construct PromptCueEmbeddingBackend
         directly (e.g. tests, custom pipelines).  In the normal PromptCueAnalyzer
         path, warm-up is handled by PromptCueClassifier.warm_up() which triggers
         model loading via _build_example_cache() → encode() → _ensure_model().
         Raises PromptCueModelLoadError if the model cannot be loaded.
         """
+        if self._embed_fn is not None:
+            return
         self._ensure_model()
 
     # ==============================================================================

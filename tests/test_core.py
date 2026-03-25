@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from promptcue import PromptCueAnalyzer, PromptCueConfig
+from promptcue.analyzer import _detect_temporal_scope
 from promptcue.constants import (
     PCUE_BASIS_TRIGGER_MATCH,
     PCUE_BASIS_WORD_OVERLAP,
@@ -62,7 +64,7 @@ class TestNormalization:
 # Cosine similarity utilities
 # ==============================================================================
 
-class TestCosineSimlarity:
+class TestCosineSimilarity:
 
     def test_identical_vectors_score_one(self) -> None:
         v = [1.0, 0.0, 0.0]
@@ -85,7 +87,7 @@ class TestCosineSimlarity:
         assert 0.0 <= s <= 1.0
 
 
-class TestCosineSimlarityBatch:
+class TestCosineSimilarityBatch:
 
     def test_empty_matrix_returns_empty_list(self) -> None:
         assert cosine_similarity_batch([1.0, 0.0], []) == []
@@ -338,3 +340,177 @@ class TestOfflineModelLoadFailure:
             pytest.raises(PromptCueModelLoadError),
         ):
             analyzer.warm_up()
+
+
+# ==============================================================================
+# Injectable embed_fn
+# ==============================================================================
+
+class TestInjectableEmbedFn:
+    """Tests for the hosted (embed_fn) operating mode.
+
+    All tests in this class run without sentence-transformers installed — the
+    embed_fn replaces the model entirely.  A simple deterministic stub is used
+    so the semantic path still produces consistent vectors.
+    """
+
+    # Dimension must match what the registry examples would produce — since we
+    # use a stub that returns a fixed-length vector, we just need it to be
+    # non-zero so cosine similarity math works.
+    _DIM = 8
+
+    @staticmethod
+    def _make_embed_fn(vector: list[float] | None = None) -> Callable[[str], list[float]]:
+        """Return an embed_fn stub that always returns the same vector."""
+        v = vector or ([1.0] + [0.0] * (TestInjectableEmbedFn._DIM - 1))
+        return lambda _text: v
+
+    def test_embed_fn_flag_forces_semantic_scoring(self) -> None:
+        # Even without sentence-transformers, enable_semantic_scoring must be
+        # True when embed_fn is provided.
+        config = PromptCueConfig(embed_fn=self._make_embed_fn())
+        assert config.enable_semantic_scoring is True
+
+    def test_backend_is_loaded_immediately(self) -> None:
+        # is_loaded must be True without calling warm_up() first.
+        backend = PromptCueEmbeddingBackend(embed_fn=self._make_embed_fn())
+        assert backend.is_loaded is True
+
+    def test_warm_up_is_noop_with_embed_fn(self) -> None:
+        # warm_up() must not raise and must not attempt to load a model.
+        backend = PromptCueEmbeddingBackend(embed_fn=self._make_embed_fn())
+        backend.warm_up()   # should not raise
+        assert backend._model is None  # internal model was never loaded
+
+    def test_encode_delegates_to_embed_fn(self) -> None:
+        expected = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+        backend  = PromptCueEmbeddingBackend(embed_fn=self._make_embed_fn(expected))
+        result   = backend.encode(['hello', 'world'])
+        assert result == [expected, expected]
+
+    def test_encode_empty_returns_empty_without_calling_fn(self) -> None:
+        call_count = 0
+
+        def counting_fn(text: str) -> list[float]:
+            nonlocal call_count
+            call_count += 1
+            return [0.0] * self._DIM
+
+        backend = PromptCueEmbeddingBackend(embed_fn=counting_fn)
+        result  = backend.encode([])
+        assert result == []
+        assert call_count == 0
+
+    def test_analyzer_accepts_embed_fn_in_config(self) -> None:
+        # End-to-end: PromptCueAnalyzer runs without loading sentence-transformers.
+        # The stub returns a constant vector so all types score equally; the
+        # deterministic trigger path will determine the actual label.  We just
+        # verify no exception is raised and a PromptCueQueryObject is returned.
+        config = PromptCueConfig(embed_fn=self._make_embed_fn())
+        analyzer = PromptCueAnalyzer(config)
+        result = analyzer.analyze('how do I set up Redis caching?')
+        assert result.primary_query_type is not None
+
+    def test_analyzer_warm_up_noop_with_embed_fn(self) -> None:
+        # warm_up() on a fully-configured analyzer with embed_fn must not raise.
+        config   = PromptCueConfig(embed_fn=self._make_embed_fn())
+        analyzer = PromptCueAnalyzer(config)
+        analyzer.warm_up()   # should not raise
+
+
+# ==============================================================================
+# Temporal scope detection
+# ==============================================================================
+
+class TestTemporalScope:
+    """Tests for _detect_temporal_scope and routing_hints['has_temporal_scope']."""
+
+    # -------------------------------------------------------------------
+    # Direct function tests — True cases
+    # -------------------------------------------------------------------
+
+    def test_year_reference_fires(self) -> None:
+        assert _detect_temporal_scope('What changed in 2023?') is True
+
+    def test_year_range_fires(self) -> None:
+        assert _detect_temporal_scope('Compare performance from 2020 to 2023') is True
+
+    def test_between_years_fires(self) -> None:
+        assert _detect_temporal_scope('Results between 2019 and 2022') is True
+
+    def test_since_year_fires(self) -> None:
+        assert _detect_temporal_scope('What happened since 2021?') is True
+
+    def test_year_over_year_fires(self) -> None:
+        assert _detect_temporal_scope('Show year-over-year growth') is True
+
+    def test_year_by_year_fires(self) -> None:
+        assert _detect_temporal_scope('Break down findings year by year') is True
+
+    def test_cross_year_fires(self) -> None:
+        assert _detect_temporal_scope('Cross-year analysis of incidents') is True
+
+    def test_by_year_fires(self) -> None:
+        assert _detect_temporal_scope('Group results by year') is True
+
+    def test_year_to_date_fires(self) -> None:
+        assert _detect_temporal_scope('Show year-to-date revenue') is True
+
+    def test_ytd_fires(self) -> None:
+        assert _detect_temporal_scope('What is the YTD total?') is True
+
+    def test_last_n_years_fires(self) -> None:
+        assert _detect_temporal_scope('Over the last 3 years, what changed?') is True
+
+    def test_past_n_years_fires(self) -> None:
+        assert _detect_temporal_scope('In the past 5 years of data') is True
+
+    def test_quarterly_trend_fires(self) -> None:
+        assert _detect_temporal_scope('Show the quarterly trend for incidents') is True
+
+    def test_annual_trend_fires(self) -> None:
+        assert _detect_temporal_scope('Describe the annual trend') is True
+
+    def test_over_time_fires(self) -> None:
+        assert _detect_temporal_scope('How does performance degrade over time?') is True
+
+    def test_quarter_ref_fires(self) -> None:
+        assert _detect_temporal_scope('Q3 2022 summary') is True
+
+    # -------------------------------------------------------------------
+    # Direct function tests — False cases (no temporal cues)
+    # -------------------------------------------------------------------
+
+    def test_plain_query_no_fire(self) -> None:
+        assert _detect_temporal_scope('How do I configure Redis caching?') is False
+
+    def test_comparison_no_year_no_fire(self) -> None:
+        assert _detect_temporal_scope('Compare Aurora and RDS for a high-read workload') is False
+
+    def test_procedure_query_no_fire(self) -> None:
+        assert _detect_temporal_scope('How do I set up JWT authentication in FastAPI?') is False
+
+    def test_version_number_no_fire(self) -> None:
+        # "2.0", "3.11", "v1.5" — version strings must not trigger year detection
+        assert _detect_temporal_scope('What is new in Python 3.11?') is False
+        assert _detect_temporal_scope('Upgrade to HTTP/2.0') is False
+
+    # -------------------------------------------------------------------
+    # End-to-end: routing_hints key present in PromptCueQueryObject
+    # -------------------------------------------------------------------
+
+    def test_routing_hint_true_for_year_query(self) -> None:
+        analyzer = PromptCueAnalyzer(PromptCueConfig(enable_semantic_scoring=False))
+        r = analyzer.analyze('What changed in 2023 compared to 2022?')
+        assert r.routing_hints.get('has_temporal_scope') is True
+
+    def test_routing_hint_false_for_plain_query(self) -> None:
+        analyzer = PromptCueAnalyzer(PromptCueConfig(enable_semantic_scoring=False))
+        r = analyzer.analyze('How do I set up Redis caching?')
+        assert r.routing_hints.get('has_temporal_scope') is False
+
+    def test_routing_hint_present_on_all_queries(self) -> None:
+        # The key must always be present, not just when True.
+        analyzer = PromptCueAnalyzer(PromptCueConfig(enable_semantic_scoring=False))
+        r = analyzer.analyze('What is a REST API?')
+        assert 'has_temporal_scope' in r.routing_hints

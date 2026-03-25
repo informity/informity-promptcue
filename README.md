@@ -20,8 +20,10 @@ PromptCue uses a **cascade classifier**:
    using trigger-phrase matching and vocabulary overlap. Fast, zero ML dependencies,
    returns immediately when confidence is high.
 2. **Semantic fallback** — when the deterministic result is ambiguous or below threshold,
-   sentence-level embeddings (`all-MiniLM-L6-v2`) re-score the query against example
-   sentences per type. Activates automatically when `sentence-transformers` is installed.
+   sentence-level embeddings re-score the query against example sentences per type.
+   Activates automatically when `sentence-transformers` is installed, or immediately when
+   you supply your own embed function via `PromptCueConfig(embed_fn=...)` (hosted mode —
+   no model loaded by PromptCue).
 
 The result is a Pydantic model (`PromptCueQueryObject`) carrying the classification, confidence,
 scope, routing hints, action directives, and any enrichment you have enabled.
@@ -33,6 +35,8 @@ scope, routing hints, action directives, and any enrichment you have enabled.
 - Python **3.13+**
 - Core dependencies: `pydantic`, `PyYAML`, `numpy` (always installed)
 - All ML/NLP components are **optional** — the package installs and runs without them
+- **Language:** English only. Triggers, examples, and pre-classification detectors
+  (continuation, structure, temporal scope) are all English-specific.
 
 ---
 
@@ -49,6 +53,10 @@ With semantic scoring (`sentence-transformers`):
 ```bash
 pip install "promptcue[semantic]"
 ```
+
+> **Hosted mode** — if your application already has an embedding model loaded (e.g. for RAG),
+> pass it via `PromptCueConfig(embed_fn=your_model.encode)`. PromptCue will use it directly
+> and you do **not** need `[semantic]` — no second model is loaded.
 
 With language detection (`langdetect`):
 
@@ -86,12 +94,20 @@ pip install -e ".[dev]"
 
 ## Production deployment
 
-PromptCue requires `sentence-transformers` to produce production-quality results.
+PromptCue requires semantic scoring to produce production-quality results.
 The deterministic-only path (`pip install promptcue`, no `[semantic]`) achieves
 approximately 40–50% accuracy on naturalistic queries and is **not a supported
 production configuration** — it is suitable for evaluation or development only.
 
-Every production deployment must:
+Semantic scoring can be provided in two ways:
+
+- **Standalone mode** — install `pip install "promptcue[semantic]"` and let PromptCue
+  load its own `all-MiniLM-L6-v2` model.
+- **Hosted mode** — pass an existing embedding function via `PromptCueConfig(embed_fn=...)`.
+  No `[semantic]` install required; PromptCue delegates encoding to the caller's model.
+  See [Hosted mode](#hosted-mode-reusing-an-existing-embedding-model).
+
+For standalone mode, every deployment must:
 
 1. Install `pip install "promptcue[semantic]"`.
 2. Pre-download the model **before** the service starts — not on first query.
@@ -121,6 +137,54 @@ Or via environment variable — no code change required:
 ```bash
 export PROMPTCUE_MODEL_CACHE=/opt/models
 ```
+
+### Hosted mode: reusing an existing embedding model
+
+If your application already has an embedding model loaded — for RAG, document indexing, or
+any other purpose — pass its encode function to `PromptCueConfig(embed_fn=...)`. PromptCue
+will delegate all vector computation to that function and will never load a model of its own.
+
+```python
+from promptcue import PromptCueAnalyzer, PromptCueConfig
+
+# my_embedder is already loaded elsewhere in your application
+def my_encode(text: str) -> list[float]:
+    return my_embedder.encode(text)        # or my_embedder.embed_query(text), etc.
+
+config   = PromptCueConfig(embed_fn=my_encode)   # no model loaded by promptcue
+analyzer = PromptCueAnalyzer(config)
+
+# warm_up() is a no-op — the external model is already loaded by the caller
+result = analyzer.analyze('How do I configure VPC peering?')
+print(result.primary_query_type)   # procedure
+```
+
+The type alias `PromptCueEmbedFn = Callable[[str], list[float]]` is exported from the
+package root and can be used to annotate injected functions:
+
+```python
+from promptcue import PromptCueEmbedFn
+
+def build_embed_fn(model) -> PromptCueEmbedFn:
+    return lambda text: model.encode(text)
+```
+
+**When to use hosted mode:**
+- Your application loads `nomic-embed-text-v1.5`, `BAAI/bge-large-en-v1.5`, or any other
+  model for retrieval/RAG and wants to classify queries with the same model — zero extra memory.
+- You are integrating PromptCue into a service that already manages its own model lifecycle
+  and you want PromptCue to be a pure classifier with no model side-effects.
+- You are running in a memory-constrained environment where loading a second model is not
+  acceptable.
+
+**Notes:**
+- `enable_semantic_scoring` is forced to `True` automatically when `embed_fn` is set, even if
+  `sentence-transformers` is not installed.
+- The inject function signature is single-text: `(str) -> list[float]`. If your model has
+  a batch API, wrap it: `lambda text: model.encode([text])[0]`.
+- `warm_up()` is a no-op. `is_loaded` returns `True` immediately.
+
+---
 
 ### Deployment patterns
 
@@ -218,6 +282,25 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+### With an injected embed function (hosted mode)
+
+Use this when your application already has an embedding model loaded and you want PromptCue
+to reuse it rather than loading a second model. No `[semantic]` extra required.
+
+```python
+from promptcue import PromptCueAnalyzer, PromptCueConfig
+
+# Stub — replace with your actual model's encode method
+def my_encode(text: str) -> list[float]:
+    return my_existing_model.embed_query(text)
+
+analyzer = PromptCueAnalyzer(PromptCueConfig(embed_fn=my_encode))
+# warm_up() not needed — model is already loaded externally
+
+result = analyzer.analyze('How do I configure VPC peering step by step?')
+print(result.primary_query_type)   # procedure
+```
+
 ### Full JSON output
 
 ```python
@@ -250,6 +333,42 @@ own YAML file — the schema is documented in `src/promptcue/data/query_types_en
 
 ---
 
+## Which field should I use?
+
+`PromptCueQueryObject` surfaces several dimensions. Use the one that matches what your
+pipeline actually needs to decide — you rarely need all of them.
+
+| I need to know... | Use this field | Example values |
+|---|---|---|
+| What the user is asking for | `primary_query_type` | `procedure`, `comparison`, `lookup` |
+| How broad or specific the query is | `scope` | `broad`, `focused`, `comparative`, `exploratory` |
+| How to structure the LLM response | `action_hints` | `should_enumerate`, `should_compare`, `should_direct_answer` |
+| Whether to retrieve / reason / check freshness | `routing_hints` | `needs_retrieval`, `needs_current_info`, `needs_reasoning` |
+| Whether the query spans a time period | `routing_hints['has_temporal_scope']` | `True` / `False` |
+| Whether the user wants a specific output format | `routing_hints['needs_structure']` | `True` / `False` |
+| Whether the query continues a prior conversation | `is_continuation` | `True` / `False` |
+| How confident the classifier is | `confidence` + `confidence_band` | `0.74`, `high` |
+
+**Common patterns:**
+
+- **Simple LLM router** — branch on `primary_query_type` alone. Done.
+- **RAG pipeline** — use `routing_hints['needs_retrieval']` to decide whether to retrieve,
+  `routing_hints['needs_current_info']` to check freshness, and `scope` to decide how many
+  results to fetch (broad → more, focused → fewer).
+- **Response generator** — act on `action_hints`: `should_enumerate` → numbered list,
+  `should_compare` → side-by-side table, `should_direct_answer` → single concise answer.
+- **Time-aware pipeline** — gate temporal aggregation on `routing_hints['has_temporal_scope']`.
+- **Structured-output pipeline** — detect explicit format requests via
+  `routing_hints['needs_structure']` before passing to the generator.
+- **Ambiguity guard** — check `confidence_band == 'low'` or `ambiguity_score > 0.5`
+  before routing; fall back to clarification when confidence is too low.
+
+> The `primary_query_type` labels are intentionally granular (12 types). If you only need
+> coarse routing, `scope` already gives you broad / focused / comparative without looking at
+> the type label at all.
+
+---
+
 ## Public API
 
 ### `PromptCueAnalyzer`
@@ -273,13 +392,14 @@ PromptCueAnalyzer(config: PromptCueConfig | None = None)
 |---|---|---|---|
 | `registry_path` | `Path \| None` | `None` | Custom YAML registry path; uses bundled default when `None` |
 | `model_cache_dir` | `Path \| None` | env / `None` | Directory where the sentence-transformers model is cached. Falls back to `PROMPTCUE_MODEL_CACHE` env var, then HuggingFace default (`~/.cache/huggingface/`) |
+| `embed_fn` | `Callable[[str], list[float]] \| None` | `None` | Injectable embed function for hosted mode. When set, PromptCue delegates all vector computation to this function and never loads a model. `enable_semantic_scoring` is forced to `True`. See [Hosted mode](#hosted-mode-reusing-an-existing-embedding-model) |
 | `similarity_threshold` | `float` | `0.55` | Minimum score for a deterministic match to be accepted |
 | `semantic_similarity_threshold` | `float` | `0.20` | Minimum score for a semantic match to be accepted |
 | `ambiguity_margin` | `float` | `0.08` | Min gap between top-2 scores before clarification is flagged |
 | `semantic_fallback_threshold` | `float` | `0.75` | Deterministic score above which the semantic pass is skipped |
 | `trigger_fallback_threshold` | `float` | `0.60` | When a trigger phrase matched and the score meets this value and the margin is clear, the deterministic result is trusted directly and semantic is skipped |
-| `enable_semantic_scoring` | `bool` | auto | `True` when `sentence-transformers` is installed, else `False` |
-| `embedding_model` | `str` | `all-MiniLM-L6-v2` | HuggingFace model name for semantic scoring |
+| `enable_semantic_scoring` | `bool` | auto | `True` when `sentence-transformers` is installed or `embed_fn` is set, else `False` |
+| `embedding_model` | `str` | `all-MiniLM-L6-v2` | HuggingFace model name for semantic scoring (ignored when `embed_fn` is set) |
 | `enable_language_detection` | `bool` | `False` | Detect BCP-47 language code; requires `promptcue[detection]` |
 | `enable_linguistic_extraction` | `bool` | `False` | Extract verbs, noun phrases, named entities; requires `promptcue[linguistic]` |
 | `enable_keyword_extraction` | `bool` | `False` | Extract keyphrases via KeyBERT; requires `promptcue[keywords]` |
@@ -310,9 +430,21 @@ PromptCueAnalyzer(config: PromptCueConfig | None = None)
 | `named_entities` | `list[str]` | Named entity surface texts, plain strings (backward compat) |
 | `entities` | `list[PromptCueEntity]` | Named entities with `text` and `entity_type` (spaCy label) |
 | `keywords` | `list[PromptCueKeyword]` | Keyphrases with `text`, `weight`, and `kind` from KeyBERT |
-| `routing_hints` | `dict[str, bool]` | `needs_retrieval`, `needs_reasoning`, `needs_current_info`, `needs_clarification` |
+| `routing_hints` | `dict[str, bool]` | `needs_retrieval`, `needs_reasoning`, `needs_current_info`, `needs_clarification`, `needs_structure`, `has_temporal_scope` |
 | `action_hints` | `dict[str, bool]` | Response-generation directives: `should_survey`, `should_enumerate`, `should_compare`, `should_direct_answer`, `should_check_recency`, `should_clarify`, `should_respond_conversationally` |
 | `constraints` | `list[str]` | Reserved for future use |
+
+---
+
+### Exceptions
+
+All exceptions inherit from `PromptCueError`.
+
+| Exception | Raised when |
+|---|---|
+| `PromptCueError` | Base class — catch this to handle all PromptCue errors |
+| `PromptCueModelLoadError` | The sentence-transformers model cannot be loaded at `warm_up()` time |
+| `PromptCueRegistryError` | The query type registry YAML is missing, malformed, or contains invalid entries |
 
 ---
 

@@ -68,6 +68,7 @@ class PromptCueClassifier:
         self.embedding_backend = PromptCueEmbeddingBackend(
             model_name=config.embedding_model,
             cache_dir=config.model_cache_dir,
+            embed_fn=config.embed_fn,
         )
         # Cached per-label example embeddings; populated lazily on first semantic classify.
         self._example_cache:   dict[str, list[list[float]]] = {}

@@ -2,8 +2,8 @@
 # Maintainer: Informity
 
 from promptcue.analyzer import PromptCueAnalyzer
-from promptcue.config import PromptCueConfig
-from promptcue.exceptions import PromptCueModelLoadError
+from promptcue.config import PromptCueConfig, PromptCueEmbedFn
+from promptcue.exceptions import PromptCueError, PromptCueModelLoadError, PromptCueRegistryError
 from promptcue.models.enums import (
     PromptCueActionHint,
     PromptCueBasis,
@@ -19,8 +19,11 @@ __all__ = [
     'PromptCueBasis',
     'PromptCueConfidenceBand',
     'PromptCueConfig',
+    'PromptCueEmbedFn',
+    'PromptCueError',
     'PromptCueModelLoadError',
     'PromptCueQueryObject',
+    'PromptCueRegistryError',
     'PromptCueRoutingHint',
     'PromptCueScope',
 ]

@@ -7,6 +7,40 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- `PromptCueConfig.embed_fn: Callable[[str], list[float]] | None` — injectable embed
+  function for **hosted mode**: when set, PromptCue delegates all vector computation to the
+  caller's function and never loads a `sentence-transformers` model of its own. Intended for
+  applications that already have an embedding model loaded (e.g. for RAG) and want to reuse
+  it for query classification without a second model load
+- `PromptCueEmbedFn` type alias — `Callable[[str], list[float]]`; exported from the package
+  root for use in type annotations
+- `PromptCueConfig` model validator — when `embed_fn` is set, `enable_semantic_scoring` is
+  forced to `True` automatically; semantic classification runs even when `sentence-transformers`
+  is not installed in the environment
+- `PromptCueEmbeddingBackend` hosted-mode behaviour — `is_loaded` returns `True` immediately
+  when `embed_fn` is provided; `warm_up()` is a no-op; `encode()` calls `embed_fn(text)` per
+  text instead of running through the model
+- 7 new tests in `tests/test_core.py::TestInjectableEmbedFn` covering the full hosted-mode
+  path end-to-end without `sentence-transformers` installed
+- README: new "Hosted mode" subsection under Production deployment, new Quick-start example,
+  `embed_fn` row in `PromptCueConfig` fields table
+- `routing_hints['has_temporal_scope']: bool` — new key present on every `PromptCueQueryObject`;
+  `True` when the query references a specific year (1900–2099), a year-over-year phrase
+  (`year-over-year`, `year-by-year`, `cross-year`, `by year`), a duration phrase
+  (`over/in the last N years`), a year range (`from YYYY to YYYY`, `between YYYY and YYYY`,
+  `since YYYY`), a periodic trend phrase (`quarterly/annual/monthly trend`, `over time`), YTD,
+  or a quarter reference (`Q1 2023`); `False` otherwise. Pure regex — no model dependency.
+  Populated by new `_detect_temporal_scope()` in `analyzer.py`
+- `PCUE_HINT_TEMPORAL = 'has_temporal_scope'` constant added to `constants.py`
+- 25 new tests in `tests/test_core.py::TestTemporalScope` covering True/False detector cases
+  and end-to-end routing_hints key presence
+
+---
+
 ## [0.2.0] — 2026-03-25
 
 ### Added

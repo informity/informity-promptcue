@@ -4,6 +4,7 @@
 from promptcue.models.enums import (
     PromptCueActionHint,
     PromptCueBasis,
+    PromptCueConfidenceBand,
     PromptCueRoutingHint,
     PromptCueScope,
 )
@@ -19,6 +20,7 @@ __all__ = [
     'PromptCueActionHint',
     'PromptCueBasis',
     'PromptCueCandidate',
+    'PromptCueConfidenceBand',
     'PromptCueEntity',
     'PromptCueKeyword',
     'PromptCueLinguistics',
