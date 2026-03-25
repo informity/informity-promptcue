@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://api.iconify.design/ri/search-ai-3-line.svg?color=%23444&width=72&height=72" alt="" />
+</p>
+
 # PromptCue — Prompt Intent Classifier for LLM Pipelines
 
 [![PyPI version](https://img.shields.io/pypi/v/promptcue.svg)](https://pypi.org/project/promptcue/)
