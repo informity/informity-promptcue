@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -35,11 +35,13 @@ class TestLanguageDetector:
                 detector.detect('This sentence is long enough to trigger detection.')
 
     def test_detection_exception_returns_unknown(self) -> None:
+        # Inject a fake langdetect module whose detect() raises so the test runs
+        # without the real package installed.
+        mock_langdetect = MagicMock()
+        mock_langdetect.detect.side_effect = Exception('LangDetectException')
         detector = PromptCueLanguageDetector(enabled=True)
-        with patch('promptcue.extraction.language.PromptCueLanguageDetector._ensure_lib'):
-            detector._loaded = True
-            with patch('langdetect.detect', side_effect=Exception('LangDetectException')):
-                result = detector.detect('This sentence should trigger detection but fail.')
+        with patch.dict('sys.modules', {'langdetect': mock_langdetect}):
+            result = detector.detect('This sentence should trigger detection but fail.')
         assert result == PCUE_UNKNOWN
 
     def test_is_loaded_false_before_warm_up(self) -> None:
@@ -47,6 +49,7 @@ class TestLanguageDetector:
         assert not detector.is_loaded
 
     def test_warm_up_sets_is_loaded(self) -> None:
+        pytest.importorskip('langdetect')
         detector = PromptCueLanguageDetector(enabled=True)
         detector.warm_up()
         assert detector.is_loaded
@@ -57,6 +60,7 @@ class TestLanguageDetector:
         assert not detector.is_loaded
 
     def test_successful_detection_returns_string(self) -> None:
+        pytest.importorskip('langdetect')
         detector = PromptCueLanguageDetector(enabled=True)
         result   = detector.detect('How do I configure Redis for production environments?')
         assert isinstance(result, str)

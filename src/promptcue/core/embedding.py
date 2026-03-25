@@ -50,8 +50,11 @@ class PromptCueEmbeddingBackend:
 
     def encode(self, texts: Iterable[str]) -> list[list[float]]:
         """Encode texts and return a list of float vectors."""
+        texts_list = list(texts)
+        if not texts_list:
+            return []
         self._ensure_model()
-        embeddings = self._model.encode(list(texts), convert_to_numpy=True)  # type: ignore[union-attr]
+        embeddings = self._model.encode(texts_list, convert_to_numpy=True)  # type: ignore[union-attr]
         return embeddings.tolist()
 
     def warm_up(self) -> None:

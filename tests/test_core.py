@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -113,18 +113,27 @@ class TestEmbeddingBackend:
         assert not backend.is_loaded
 
     def test_warm_up_sets_is_loaded(self) -> None:
+        pytest.importorskip('sentence_transformers')
         backend = PromptCueEmbeddingBackend()
         backend.warm_up()
         assert backend.is_loaded
 
     def test_encode_empty_list_returns_empty(self) -> None:
+        # No model needed — empty input short-circuits before _ensure_model().
         backend = PromptCueEmbeddingBackend()
         result  = backend.encode([])
         assert result == []
 
     def test_failed_model_load_raises_promptcue_error(self) -> None:
+        # Inject a fake sentence_transformers whose constructor raises OSError so
+        # the test runs without the real package installed.
+        mock_st = MagicMock()
+        mock_st.SentenceTransformer.side_effect = OSError('model not found')
         backend = PromptCueEmbeddingBackend(model_name='nonexistent-model-xyz')
-        with pytest.raises(PromptCueModelLoadError):
+        with (
+            patch.dict('sys.modules', {'sentence_transformers': mock_st}),
+            pytest.raises(PromptCueModelLoadError),
+        ):
             backend.warm_up()
 
 
@@ -245,6 +254,7 @@ class TestClassifierTiers:
         assert result.candidates[0].basis in {PCUE_BASIS_TRIGGER_MATCH, PCUE_BASIS_WORD_OVERLAP}
 
     def test_cascade_trigger_overrides_semantic(self) -> None:
+        pytest.importorskip('sentence_transformers')
         # With semantic enabled, a strong trigger should still win over semantic path.
         config   = PromptCueConfig(enable_semantic_scoring=True)
         registry = PromptCueRegistry()
@@ -317,13 +327,14 @@ class TestSchemaPhase1Fields:
 class TestOfflineModelLoadFailure:
 
     def test_failed_warm_up_raises_promptcue_model_load_error(self) -> None:
+        # Inject a fake sentence_transformers whose constructor raises OSError so
+        # the test runs without the real package installed.
+        mock_st = MagicMock()
+        mock_st.SentenceTransformer.side_effect = OSError('model not found')
         config   = PromptCueConfig(enable_semantic_scoring=True)
         analyzer = PromptCueAnalyzer(config)
         with (
-            patch(
-                'sentence_transformers.SentenceTransformer',
-                side_effect=OSError('model not found'),
-            ),
+            patch.dict('sys.modules', {'sentence_transformers': mock_st}),
             pytest.raises(PromptCueModelLoadError),
         ):
             analyzer.warm_up()
