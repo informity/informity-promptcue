@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="https://api.iconify.design/ri/search-ai-3-line.svg?color=%23444&width=72&height=72" alt="" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)"
+            srcset="https://api.iconify.design/ri/search-ai-3-line.svg?color=%23ffffff&width=72&height=72" />
+    <img src="https://api.iconify.design/ri/search-ai-3-line.svg?color=%23222222&width=72&height=72" alt="" />
+  </picture>
 </p>
 
 # PromptCue — Prompt Intent Classifier for LLM Pipelines
