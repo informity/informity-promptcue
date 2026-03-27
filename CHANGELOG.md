@@ -28,14 +28,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   path end-to-end without `sentence-transformers` installed
 - README: new "Hosted mode" subsection under Production deployment, new Quick-start example,
   `embed_fn` row in `PromptCueConfig` fields table
-- `routing_hints['has_temporal_scope']: bool` — new key present on every `PromptCueQueryObject`;
-  `True` when the query references a specific year (1900–2099), a year-over-year phrase
-  (`year-over-year`, `year-by-year`, `cross-year`, `by year`), a duration phrase
-  (`over/in the last N years`), a year range (`from YYYY to YYYY`, `between YYYY and YYYY`,
-  `since YYYY`), a periodic trend phrase (`quarterly/annual/monthly trend`, `over time`), YTD,
-  or a quarter reference (`Q1 2023`); `False` otherwise. Pure regex — no model dependency.
-  Populated by new `_detect_temporal_scope()` in `analyzer.py`
-- `PCUE_HINT_TEMPORAL = 'has_temporal_scope'` constant added to `constants.py`
+- `semantic_hints` on `PromptCueQueryObject` with agnostic keys:
+  `mentions_multiple_items`, `requests_comparison`, `requests_enumeration`,
+  `requests_structure`, `mentions_time`, `requires_multi_period_analysis`
+- `confidence_meta` on `PromptCueQueryObject`:
+  `type_confidence_margin`, `scope_confidence`, `scope_confidence_margin`
+- `explanations` on `PromptCueQueryObject`:
+  `decision_notes`, `evidence_tokens`
+- Temporal semantics now live only in `semantic_hints`:
+  `mentions_time` + `requires_multi_period_analysis` (not duplicated in `routing_hints`)
 - 25 new tests in `tests/test_core.py::TestTemporalScope` covering True/False detector cases
   and end-to-end routing_hints key presence
 - `PromptCueConfig.show_progress_bar: bool` (default `False`) — standalone-mode control

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from promptcue import PromptCueAnalyzer, PromptCueConfig
-from promptcue.analyzer import _detect_temporal_scope
+from promptcue.analyzer import _detect_mentions_time, _detect_requires_multi_period_analysis
 from promptcue.constants import (
     PCUE_BASIS_TRIGGER_MATCH,
     PCUE_BASIS_WORD_OVERLAP,
@@ -449,94 +449,123 @@ class TestInjectableEmbedFn:
 # ==============================================================================
 
 class TestTemporalScope:
-    """Tests for _detect_temporal_scope and routing_hints['has_temporal_scope']."""
+    """Tests for temporal detection and semantic temporal hints."""
 
     # -------------------------------------------------------------------
     # Direct function tests — True cases
     # -------------------------------------------------------------------
 
     def test_year_reference_fires(self) -> None:
-        assert _detect_temporal_scope('What changed in 2023?') is True
+        assert _detect_mentions_time('What changed in 2023?') is True
+        assert _detect_requires_multi_period_analysis('What changed in 2023?') is False
 
     def test_year_range_fires(self) -> None:
-        assert _detect_temporal_scope('Compare performance from 2020 to 2023') is True
+        assert _detect_mentions_time('Compare performance from 2020 to 2023') is True
+        assert (
+            _detect_requires_multi_period_analysis('Compare performance from 2020 to 2023')
+            is True
+        )
 
     def test_between_years_fires(self) -> None:
-        assert _detect_temporal_scope('Results between 2019 and 2022') is True
+        assert _detect_mentions_time('Results between 2019 and 2022') is True
+        assert _detect_requires_multi_period_analysis('Results between 2019 and 2022') is True
 
     def test_since_year_fires(self) -> None:
-        assert _detect_temporal_scope('What happened since 2021?') is True
+        assert _detect_mentions_time('What happened since 2021?') is True
 
     def test_year_over_year_fires(self) -> None:
-        assert _detect_temporal_scope('Show year-over-year growth') is True
+        assert _detect_mentions_time('Show year-over-year growth') is True
+        assert _detect_requires_multi_period_analysis('Show year-over-year growth') is True
 
     def test_year_by_year_fires(self) -> None:
-        assert _detect_temporal_scope('Break down findings year by year') is True
+        assert _detect_mentions_time('Break down findings year by year') is True
+        assert _detect_requires_multi_period_analysis('Break down findings year by year') is True
 
     def test_cross_year_fires(self) -> None:
-        assert _detect_temporal_scope('Cross-year analysis of incidents') is True
+        assert _detect_mentions_time('Cross-year analysis of incidents') is True
+        assert _detect_requires_multi_period_analysis('Cross-year analysis of incidents') is True
 
     def test_by_year_fires(self) -> None:
-        assert _detect_temporal_scope('Group results by year') is True
+        assert _detect_mentions_time('Group results by year') is True
+        assert _detect_requires_multi_period_analysis('Group results by year') is True
 
     def test_year_to_date_fires(self) -> None:
-        assert _detect_temporal_scope('Show year-to-date revenue') is True
+        assert _detect_mentions_time('Show year-to-date revenue') is True
 
     def test_ytd_fires(self) -> None:
-        assert _detect_temporal_scope('What is the YTD total?') is True
+        assert _detect_mentions_time('What is the YTD total?') is True
 
     def test_last_n_years_fires(self) -> None:
-        assert _detect_temporal_scope('Over the last 3 years, what changed?') is True
+        assert _detect_mentions_time('Over the last 3 years, what changed?') is True
+        assert (
+            _detect_requires_multi_period_analysis('Over the last 3 years, what changed?')
+            is True
+        )
 
     def test_past_n_years_fires(self) -> None:
-        assert _detect_temporal_scope('In the past 5 years of data') is True
+        assert _detect_mentions_time('In the past 5 years of data') is True
+        assert _detect_requires_multi_period_analysis('In the past 5 years of data') is True
 
     def test_quarterly_trend_fires(self) -> None:
-        assert _detect_temporal_scope('Show the quarterly trend for incidents') is True
+        assert _detect_mentions_time('Show the quarterly trend for incidents') is True
+        assert (
+            _detect_requires_multi_period_analysis('Show the quarterly trend for incidents')
+            is True
+        )
 
     def test_annual_trend_fires(self) -> None:
-        assert _detect_temporal_scope('Describe the annual trend') is True
+        assert _detect_mentions_time('Describe the annual trend') is True
 
     def test_over_time_fires(self) -> None:
-        assert _detect_temporal_scope('How does performance degrade over time?') is True
+        assert _detect_mentions_time('How does performance degrade over time?') is True
+        assert (
+            _detect_requires_multi_period_analysis('How does performance degrade over time?')
+            is True
+        )
 
     def test_quarter_ref_fires(self) -> None:
-        assert _detect_temporal_scope('Q3 2022 summary') is True
+        assert _detect_mentions_time('Q3 2022 summary') is True
 
     # -------------------------------------------------------------------
     # Direct function tests — False cases (no temporal cues)
     # -------------------------------------------------------------------
 
     def test_plain_query_no_fire(self) -> None:
-        assert _detect_temporal_scope('How do I configure Redis caching?') is False
+        assert _detect_mentions_time('How do I configure Redis caching?') is False
 
     def test_comparison_no_year_no_fire(self) -> None:
-        assert _detect_temporal_scope('Compare Aurora and RDS for a high-read workload') is False
+        query = 'Compare Aurora and RDS for a high-read workload'
+        assert _detect_mentions_time(query) is False
+        assert (
+            _detect_requires_multi_period_analysis(query)
+            is False
+        )
 
     def test_procedure_query_no_fire(self) -> None:
-        assert _detect_temporal_scope('How do I set up JWT authentication in FastAPI?') is False
+        assert _detect_mentions_time('How do I set up JWT authentication in FastAPI?') is False
 
     def test_version_number_no_fire(self) -> None:
         # "2.0", "3.11", "v1.5" — version strings must not trigger year detection
-        assert _detect_temporal_scope('What is new in Python 3.11?') is False
-        assert _detect_temporal_scope('Upgrade to HTTP/2.0') is False
+        assert _detect_mentions_time('What is new in Python 3.11?') is False
+        assert _detect_mentions_time('Upgrade to HTTP/2.0') is False
 
     # -------------------------------------------------------------------
-    # End-to-end: routing_hints key present in PromptCueQueryObject
+    # End-to-end: semantic temporal hints present in PromptCueQueryObject
     # -------------------------------------------------------------------
 
-    def test_routing_hint_true_for_year_query(self) -> None:
+    def test_semantic_hints_true_for_year_query(self) -> None:
         analyzer = PromptCueAnalyzer(PromptCueConfig(enable_semantic_scoring=False))
         r = analyzer.analyze('What changed in 2023 compared to 2022?')
-        assert r.routing_hints.get('has_temporal_scope') is True
+        assert r.semantic_hints.mentions_time is True
+        assert r.semantic_hints.requires_multi_period_analysis is True
 
-    def test_routing_hint_false_for_plain_query(self) -> None:
+    def test_semantic_hints_false_for_plain_query(self) -> None:
         analyzer = PromptCueAnalyzer(PromptCueConfig(enable_semantic_scoring=False))
         r = analyzer.analyze('How do I set up Redis caching?')
-        assert r.routing_hints.get('has_temporal_scope') is False
+        assert r.semantic_hints.mentions_time is False
+        assert r.semantic_hints.requires_multi_period_analysis is False
 
-    def test_routing_hint_present_on_all_queries(self) -> None:
-        # The key must always be present, not just when True.
+    def test_semantic_hints_present_on_all_queries(self) -> None:
         analyzer = PromptCueAnalyzer(PromptCueConfig(enable_semantic_scoring=False))
         r = analyzer.analyze('What is a REST API?')
-        assert 'has_temporal_scope' in r.routing_hints
+        assert hasattr(r, 'semantic_hints')

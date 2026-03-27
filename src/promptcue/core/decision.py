@@ -28,10 +28,14 @@ class PromptCueDecisionResult:
     confidence:           float
     confidence_band:      PromptCueConfidenceBand
     ambiguity_score:      float
+    type_confidence_margin: float
+    scope_confidence:     float
+    scope_confidence_margin: float
     classification_basis: str
     scope:                PromptCueScope
     routing_hints:        dict[str, bool]
     action_hints:         dict[str, bool] = field(default_factory=dict)
+    decision_notes:       list[str] = field(default_factory=list)
 
 
 class PromptCueDecisionEngine:
@@ -89,6 +93,9 @@ class PromptCueDecisionEngine:
                 confidence           = 0.0,
                 confidence_band      = PromptCueConfidenceBand.LOW,
                 ambiguity_score      = 1.0,
+                type_confidence_margin = 0.0,
+                scope_confidence     = 0.0,
+                scope_confidence_margin = 0.0,
                 classification_basis = PCUE_BASIS_BELOW_THRESHOLD,
                 scope                = PromptCueScope.UNKNOWN,
                 routing_hints        = {
@@ -98,6 +105,7 @@ class PromptCueDecisionEngine:
                     PCUE_HINT_CURRENT_INFO:  False,
                 },
                 action_hints         = {PCUE_ACTION_CLARIFY: True},
+                decision_notes       = ['no_candidates'],
             )
 
         threshold    = (
@@ -117,6 +125,9 @@ class PromptCueDecisionEngine:
                 confidence           = top.score,
                 confidence_band      = PromptCueConfidenceBand.LOW,
                 ambiguity_score      = ambiguity,
+                type_confidence_margin = margin,
+                scope_confidence     = 0.0,
+                scope_confidence_margin = margin,
                 classification_basis = PCUE_BASIS_BELOW_THRESHOLD,
                 scope                = PromptCueScope.UNKNOWN,
                 routing_hints        = {
@@ -126,6 +137,7 @@ class PromptCueDecisionEngine:
                     PCUE_HINT_CURRENT_INFO:  False,
                 },
                 action_hints         = {PCUE_ACTION_CLARIFY: True},
+                decision_notes       = ['below_threshold'],
             )
 
         # Pull routing, scope, and action directives from the registry.
@@ -165,13 +177,21 @@ class PromptCueDecisionEngine:
         if is_ambiguous:
             action_hints[PCUE_ACTION_CLARIFY] = True
 
+        decision_notes: list[str] = ['resolved_primary_label']
+        if is_ambiguous:
+            decision_notes.append('ambiguous_margin')
+
         return PromptCueDecisionResult(
             primary_label        = top.label,
             confidence           = top.score,
             confidence_band      = self._confidence_band(top.score, top.basis),
             ambiguity_score      = ambiguity,
+            type_confidence_margin = margin,
+            scope_confidence     = (top.score if scope != PromptCueScope.UNKNOWN else 0.0),
+            scope_confidence_margin = margin,
             classification_basis = top.basis,
             scope                = scope,
             routing_hints        = routing_hints,
             action_hints         = action_hints,
+            decision_notes       = decision_notes,
         )

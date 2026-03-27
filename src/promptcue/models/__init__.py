@@ -10,21 +10,27 @@ from promptcue.models.enums import (
 )
 from promptcue.models.schema import (
     PromptCueCandidate,
+    PromptCueConfidenceMeta,
     PromptCueEntity,
+    PromptCueExplanations,
     PromptCueKeyword,
     PromptCueLinguistics,
     PromptCueQueryObject,
+    PromptCueSemanticHints,
 )
 
 __all__ = [
     'PromptCueActionHint',
     'PromptCueBasis',
     'PromptCueCandidate',
+    'PromptCueConfidenceMeta',
     'PromptCueConfidenceBand',
     'PromptCueEntity',
+    'PromptCueExplanations',
     'PromptCueKeyword',
     'PromptCueLinguistics',
     'PromptCueQueryObject',
+    'PromptCueSemanticHints',
     'PromptCueRoutingHint',
     'PromptCueScope',
 ]

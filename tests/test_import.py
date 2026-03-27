@@ -32,7 +32,7 @@ def test_exception_imports() -> None:
 def test_enum_imports() -> None:
     assert PromptCueScope.BROAD                          == 'broad'
     assert PromptCueRoutingHint.NEEDS_RETRIEVAL          == 'needs_retrieval'
-    assert PromptCueRoutingHint.TEMPORAL_SCOPE           == 'has_temporal_scope'
+    assert PromptCueRoutingHint.NEEDS_STRUCTURE          == 'needs_structure'
     assert PromptCueActionHint.CONVERSATIONAL            == 'should_respond_conversationally'
     assert PromptCueBasis.TRIGGER_MATCH                  == 'trigger_match'
     assert PromptCueBasis.BELOW_THRESHOLD                == 'below_threshold'

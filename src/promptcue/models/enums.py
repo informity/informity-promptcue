@@ -26,7 +26,6 @@ class PromptCueRoutingHint(StrEnum):
     NEEDS_CURRENT_INFO  = 'needs_current_info'
     NEEDS_CLARIFICATION = 'needs_clarification'
     NEEDS_STRUCTURE     = 'needs_structure'
-    TEMPORAL_SCOPE      = 'has_temporal_scope'
 
 
 class PromptCueActionHint(StrEnum):

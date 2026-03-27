@@ -356,7 +356,8 @@ pipeline actually needs to decide — you rarely need all of them.
 | How broad or specific the query is | `scope` | `broad`, `focused`, `comparative`, `exploratory` |
 | How to structure the LLM response | `action_hints` | `should_enumerate`, `should_compare`, `should_direct_answer` |
 | Whether to retrieve / reason / check freshness | `routing_hints` | `needs_retrieval`, `needs_current_info`, `needs_reasoning` |
-| Whether the query spans a time period | `routing_hints['has_temporal_scope']` | `True` / `False` |
+| Whether the query mentions time | `semantic_hints.mentions_time` | `True` / `False` |
+| Whether the query requires cross-period analysis | `semantic_hints.requires_multi_period_analysis` | `True` / `False` |
 | Whether the user wants a specific output format | `routing_hints['needs_structure']` | `True` / `False` |
 | Whether the query continues a prior conversation | `is_continuation` | `True` / `False` |
 | How confident the classifier is | `confidence` + `confidence_band` | `0.74`, `high` |
@@ -369,7 +370,7 @@ pipeline actually needs to decide — you rarely need all of them.
   results to fetch (broad → more, focused → fewer).
 - **Response generator** — act on `action_hints`: `should_enumerate` → numbered list,
   `should_compare` → side-by-side table, `should_direct_answer` → single concise answer.
-- **Time-aware pipeline** — gate temporal aggregation on `routing_hints['has_temporal_scope']`.
+- **Time-aware pipeline** — gate temporal aggregation on `semantic_hints.requires_multi_period_analysis`.
 - **Structured-output pipeline** — detect explicit format requests via
   `routing_hints['needs_structure']` before passing to the generator.
 - **Ambiguity guard** — check `confidence_band == 'low'` or `ambiguity_score > 0.5`
@@ -443,7 +444,10 @@ PromptCueAnalyzer(config: PromptCueConfig | None = None)
 | `named_entities` | `list[str]` | Named entity surface texts, plain strings (backward compat) |
 | `entities` | `list[PromptCueEntity]` | Named entities with `text` and `entity_type` (spaCy label) |
 | `keywords` | `list[PromptCueKeyword]` | Keyphrases with `text`, `weight`, and `kind` from KeyBERT |
-| `routing_hints` | `dict[str, bool]` | `needs_retrieval`, `needs_reasoning`, `needs_current_info`, `needs_clarification`, `needs_structure`, `has_temporal_scope` |
+| `routing_hints` | `dict[str, bool]` | `needs_retrieval`, `needs_reasoning`, `needs_current_info`, `needs_clarification`, `needs_structure` |
+| `semantic_hints` | `PromptCueSemanticHints` | Agnostic semantic cues (`mentions_multiple_items`, `requests_comparison`, `requests_enumeration`, `requests_structure`, `mentions_time`, `requires_multi_period_analysis`) |
+| `confidence_meta` | `PromptCueConfidenceMeta` | Confidence diagnostics (`type_confidence_margin`, `scope_confidence`, `scope_confidence_margin`) |
+| `explanations` | `PromptCueExplanations` | Debug metadata (`decision_notes`, `evidence_tokens`) |
 | `action_hints` | `dict[str, bool]` | Response-generation directives: `should_survey`, `should_enumerate`, `should_compare`, `should_direct_answer`, `should_check_recency`, `should_clarify`, `should_respond_conversationally` |
 | `constraints` | `list[str]` | Reserved for future use |
 

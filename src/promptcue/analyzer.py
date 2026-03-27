@@ -11,7 +11,6 @@ from promptcue.constants import (
     PCUE_BASIS_SEMANTIC,
     PCUE_DEFAULT_REGISTRY,
     PCUE_HINT_STRUCTURE,
-    PCUE_HINT_TEMPORAL,
     PCUE_SCHEMA_VERSION,
 )
 from promptcue.core.classifier import PromptCueClassifier
@@ -21,7 +20,12 @@ from promptcue.extraction.keywords import PromptCueKeywordExtractor
 from promptcue.extraction.language import PromptCueLanguageDetector
 from promptcue.extraction.linguistic import PromptCueLinguisticExtractor
 from promptcue.extraction.normalization import normalize_text
-from promptcue.models.schema import PromptCueQueryObject
+from promptcue.models.schema import (
+    PromptCueConfidenceMeta,
+    PromptCueExplanations,
+    PromptCueQueryObject,
+    PromptCueSemanticHints,
+)
 
 # ==============================================================================
 # Pre-classification detectors — pure regex, no model dependency
@@ -57,6 +61,25 @@ _STRUCTURE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r'\borganiz(?:e|ed)\s+(?:it\s+)?as\b', re.IGNORECASE),
     re.compile(r'\bstructur(?:e|ed)\s+(?:it\s+)?as\b', re.IGNORECASE),
     re.compile(r'\bpresent\s+(?:this|it)\s+as\b', re.IGNORECASE),
+]
+_MULTI_ITEM_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(
+        r'\b(across all|all (?:documents|files|records)|multiple (?:documents|files|records))\b',
+        re.IGNORECASE,
+    ),
+    re.compile(r'\b(documents|files|records)\b', re.IGNORECASE),
+]
+_COMPARISON_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(
+        r'\b(compare|contrast|versus|vs\.?|trade[-\s]*offs?|pros?\s+and\s+cons?)\b',
+        re.IGNORECASE,
+    ),
+]
+_ENUMERATION_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(
+        r'\b(list|enumerate|step[-\s]*by[-\s]*step|top\s+\d+|bullet(?:s| points?)?)\b',
+        re.IGNORECASE,
+    ),
 ]
 
 
@@ -116,17 +139,61 @@ _TEMPORAL_SCOPE_PATTERNS: list[re.Pattern[str]] = [
 ]
 
 
-def _detect_temporal_scope(text: str) -> bool:
+def _detect_mentions_time(text: str) -> bool:
     """Return True when text references a specific time period or temporal aggregation.
 
     Covers year references (2020, 2021...), year-over-year phrases, multi-year
     duration phrases ("over the last 3 years"), year ranges, and periodic trend
     phrases.  Pure regex — no model dependency.
 
-    Populates routing_hints['has_temporal_scope'] so that any time-aware
-    application can act on the signal without re-implementing the detection.
+    Populates the generic semantic hint `mentions_time`.
     """
     return any(pat.search(text) for pat in _TEMPORAL_SCOPE_PATTERNS)
+
+
+_MULTI_PERIOD_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r'\byear[-\s]*(?:by|over)[-\s]*year\b', re.IGNORECASE),
+    re.compile(r'\bcross[-\s]*year\b', re.IGNORECASE),
+    re.compile(r'\bby\s+year\b', re.IGNORECASE),
+    re.compile(r'\bover\s+time\b', re.IGNORECASE),
+    re.compile(r'\b(?:quarterly|annual|monthly)\s+trend\b', re.IGNORECASE),
+    re.compile(r'\b(?:over|in|for)\s+the\s+(?:last|past)\s+\d+\s+years?\b', re.IGNORECASE),
+    re.compile(r'\bfrom\s+(?:19|20)\d{2}\s+to\s+(?:19|20)\d{2}\b', re.IGNORECASE),
+    re.compile(r'\bbetween\s+(?:19|20)\d{2}\s+and\s+(?:19|20)\d{2}\b', re.IGNORECASE),
+]
+
+
+def _detect_requires_multi_period_analysis(text: str) -> bool:
+    """Return True for prompts that explicitly require analysis across periods."""
+    if any(pat.search(text) for pat in _MULTI_PERIOD_PATTERNS):
+        return True
+    years = re.findall(r'\b(?:19|20)\d{2}\b', text)
+    return len(set(years)) >= 2
+
+
+def _detect_mentions_multiple_items(text: str) -> bool:
+    return any(pat.search(text) for pat in _MULTI_ITEM_PATTERNS)
+
+
+def _detect_requests_comparison(text: str) -> bool:
+    return any(pat.search(text) for pat in _COMPARISON_PATTERNS)
+
+
+def _detect_requests_enumeration(text: str) -> bool:
+    return any(pat.search(text) for pat in _ENUMERATION_PATTERNS)
+
+
+def _extract_evidence_tokens(text: str, limit: int = 8) -> list[str]:
+    seen: set[str] = set()
+    tokens: list[str] = []
+    for token in re.findall(r'[a-z0-9][a-z0-9_-]{2,}', text.casefold()):
+        if token in seen:
+            continue
+        seen.add(token)
+        tokens.append(token)
+        if len(tokens) >= limit:
+            break
+    return tokens
 
 
 class PromptCueAnalyzer:
@@ -198,7 +265,11 @@ class PromptCueAnalyzer:
         # Pre-classification structural signals — pure regex, no model dependency.
         is_continuation  = _detect_continuation(normalized)
         needs_structure  = _detect_needs_structure(text)   # use raw text for Markdown patterns
-        temporal_scope   = _detect_temporal_scope(normalized)
+        mentions_time = _detect_mentions_time(normalized)
+        requires_multi_period_analysis = _detect_requires_multi_period_analysis(normalized)
+        mentions_multiple_items = _detect_mentions_multiple_items(normalized)
+        requests_comparison = _detect_requests_comparison(normalized)
+        requests_enumeration = _detect_requests_enumeration(normalized)
 
         classification = self.classifier.classify(normalized)
 
@@ -220,7 +291,6 @@ class PromptCueAnalyzer:
         routing_hints = {
             **decision.routing_hints,
             PCUE_HINT_STRUCTURE: needs_structure,
-            PCUE_HINT_TEMPORAL:  temporal_scope,
         }
 
         return PromptCueQueryObject(
@@ -235,6 +305,11 @@ class PromptCueAnalyzer:
             confidence             = decision.confidence,
             confidence_band        = decision.confidence_band,
             ambiguity_score        = decision.ambiguity_score,
+            confidence_meta        = PromptCueConfidenceMeta(
+                type_confidence_margin=decision.type_confidence_margin,
+                scope_confidence=decision.scope_confidence,
+                scope_confidence_margin=decision.scope_confidence_margin,
+            ),
             scope                  = decision.scope,
             main_verbs             = linguistic.main_verbs,
             noun_phrases           = linguistic.noun_phrases,
@@ -243,4 +318,16 @@ class PromptCueAnalyzer:
             keywords               = keywords,
             routing_hints          = routing_hints,
             action_hints           = decision.action_hints,
+            semantic_hints         = PromptCueSemanticHints(
+                mentions_multiple_items=mentions_multiple_items,
+                requests_comparison=requests_comparison,
+                requests_enumeration=requests_enumeration,
+                requests_structure=needs_structure,
+                mentions_time=mentions_time,
+                requires_multi_period_analysis=requires_multi_period_analysis,
+            ),
+            explanations           = PromptCueExplanations(
+                decision_notes=decision.decision_notes,
+                evidence_tokens=_extract_evidence_tokens(normalized),
+            ),
         )

@@ -52,6 +52,29 @@ class PromptCueLinguistics(BaseModel):
         return data
 
 
+class PromptCueConfidenceMeta(BaseModel):
+    """Generic confidence diagnostics for downstream policy decisions."""
+    type_confidence_margin: float = Field(ge=0.0, le=1.0, default=0.0)
+    scope_confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+    scope_confidence_margin: float = Field(ge=0.0, le=1.0, default=0.0)
+
+
+class PromptCueSemanticHints(BaseModel):
+    """Agnostic semantic cues inferred from the input prompt."""
+    mentions_multiple_items: bool = False
+    requests_comparison: bool = False
+    requests_enumeration: bool = False
+    requests_structure: bool = False
+    mentions_time: bool = False
+    requires_multi_period_analysis: bool = False
+
+
+class PromptCueExplanations(BaseModel):
+    """Compact human-readable rationale for debugging and observability."""
+    decision_notes: list[str] = Field(default_factory=list)
+    evidence_tokens: list[str] = Field(default_factory=list)
+
+
 class PromptCueQueryObject(BaseModel):
     """Structured understanding of a single query — the public output of PromptCueAnalyzer."""
 
@@ -78,6 +101,7 @@ class PromptCueQueryObject(BaseModel):
     confidence:            float               = Field(ge=0.0, le=1.0)
     confidence_band:       PromptCueConfidenceBand = PromptCueConfidenceBand.LOW
     ambiguity_score:       float               = Field(ge=0.0, le=1.0)
+    confidence_meta:       PromptCueConfidenceMeta = Field(default_factory=PromptCueConfidenceMeta)
 
     @property
     def runner_up(self) -> PromptCueCandidate | None:
@@ -112,6 +136,8 @@ class PromptCueQueryObject(BaseModel):
     # Constraints (reserved — populated in future milestones)
     # ==============================================================================
     constraints: list[str] = Field(default_factory=list)
+    semantic_hints: PromptCueSemanticHints = Field(default_factory=PromptCueSemanticHints)
+    explanations: PromptCueExplanations = Field(default_factory=PromptCueExplanations)
 
     @property
     def query_type(self) -> str:

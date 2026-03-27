@@ -11,7 +11,12 @@ from promptcue.models.enums import (
     PromptCueRoutingHint,
     PromptCueScope,
 )
-from promptcue.models.schema import PromptCueQueryObject
+from promptcue.models.schema import (
+    PromptCueConfidenceMeta,
+    PromptCueExplanations,
+    PromptCueQueryObject,
+    PromptCueSemanticHints,
+)
 
 __all__ = [
     'PromptCueActionHint',
@@ -19,11 +24,14 @@ __all__ = [
     'PromptCueBasis',
     'PromptCueConfidenceBand',
     'PromptCueConfig',
+    'PromptCueConfidenceMeta',
     'PromptCueEmbedFn',
     'PromptCueError',
+    'PromptCueExplanations',
     'PromptCueModelLoadError',
     'PromptCueQueryObject',
     'PromptCueRegistryError',
     'PromptCueRoutingHint',
+    'PromptCueSemanticHints',
     'PromptCueScope',
 ]

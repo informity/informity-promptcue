@@ -49,7 +49,6 @@ PCUE_HINT_REASONING     = 'needs_reasoning'
 PCUE_HINT_CURRENT_INFO  = 'needs_current_info'
 PCUE_HINT_CLARIFICATION = 'needs_clarification'
 PCUE_HINT_STRUCTURE     = 'needs_structure'
-PCUE_HINT_TEMPORAL      = 'has_temporal_scope'
 
 # ==============================================================================
 # Scope values — must mirror values used in query_types_en.yaml and PromptCueScope enum

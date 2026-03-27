@@ -164,3 +164,24 @@ def test_entities_and_named_entities_are_consistent() -> None:
 def test_constraints_field_is_present_and_empty() -> None:
     result = PromptCueAnalyzer().analyze('compare aurora and opensearch for rag')
     assert result.constraints == []
+
+
+def test_confidence_meta_present_and_normalized() -> None:
+    result = PromptCueAnalyzer().analyze('compare aurora and opensearch for rag')
+    assert 0.0 <= result.confidence_meta.type_confidence_margin <= 1.0
+    assert 0.0 <= result.confidence_meta.scope_confidence <= 1.0
+    assert 0.0 <= result.confidence_meta.scope_confidence_margin <= 1.0
+
+
+def test_semantic_hints_present() -> None:
+    result = PromptCueAnalyzer().analyze('Compare yearly trends in incidents from 2021 to 2023.')
+    assert isinstance(result.semantic_hints.mentions_multiple_items, bool)
+    assert isinstance(result.semantic_hints.requests_structure, bool)
+    assert result.semantic_hints.mentions_time is True
+    assert result.semantic_hints.requires_multi_period_analysis is True
+
+
+def test_explanations_present() -> None:
+    result = PromptCueAnalyzer().analyze('How do I configure Redis cache step by step?')
+    assert isinstance(result.explanations.decision_notes, list)
+    assert isinstance(result.explanations.evidence_tokens, list)
