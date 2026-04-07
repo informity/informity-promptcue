@@ -88,3 +88,35 @@ def test_explicit_recency_promotes_freshness_hints() -> None:
     assert result.semantic_hints.explicit_recency is True
     assert result.semantic_hints.mentions_time is False
     assert result.primary_query_type in _KNOWN_TYPES
+
+
+def test_coverage_promotion_for_broad_amounts_prompt() -> None:
+    result = PromptCueAnalyzer().analyze(
+        'Which indexed documents contain numeric amounts or financial figures? List the files and the key amounts found.'
+    )
+    assert result.primary_query_type == 'coverage'
+    assert str(result.scope) == 'broad'
+
+
+def test_coverage_promotion_for_broad_dates_prompt() -> None:
+    result = PromptCueAnalyzer().analyze(
+        'What are the most important dates mentioned across all indexed documents?'
+    )
+    assert result.primary_query_type == 'coverage'
+    assert str(result.scope) == 'broad'
+
+
+def test_coverage_promotion_for_compliance_contract_prompt() -> None:
+    result = PromptCueAnalyzer().analyze(
+        'Return a compliance-ready brief with headings exactly in this order: ## Requested Output Contract, ## Evidence Coverage, ## Conflicts and Contradictions, ## Missing Evidence, ## Verification Plan.'
+    )
+    assert result.primary_query_type == 'coverage'
+    assert str(result.scope) == 'broad'
+
+
+def test_coverage_promotion_for_people_across_documents_prompt() -> None:
+    result = PromptCueAnalyzer().analyze(
+        'What are the names of people mentioned across all indexed documents?'
+    )
+    assert result.primary_query_type == 'coverage'
+    assert str(result.scope) == 'broad'

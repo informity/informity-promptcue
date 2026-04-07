@@ -67,10 +67,13 @@ _STRUCTURE_PATTERNS: list[re.Pattern[str]] = [
 ]
 _MULTI_ITEM_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
-        r'\b(across all|all (?:documents|files|records)|multiple (?:documents|files|records))\b',
+        r'\b(across all|across the entire|all (?:indexed )?(?:documents|files|records)|multiple (?:documents|files|records))\b',
         re.IGNORECASE,
     ),
     re.compile(r'\b(documents|files|records)\b', re.IGNORECASE),
+    re.compile(r'\bmost important (?:dates|amounts|figures|names)\b', re.IGNORECASE),
+    re.compile(r'\bkey amounts found\b', re.IGNORECASE),
+    re.compile(r'\bnames of people mentioned across all\b', re.IGNORECASE),
 ]
 _COMPARISON_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
@@ -226,6 +229,24 @@ def _extract_evidence_tokens(text: str, limit: int = 8) -> list[str]:
     return tokens
 
 
+def _should_promote_to_coverage(*, primary_label: str, hints: PromptCueSemanticHints) -> bool:
+    """Promote focused-family intents to coverage when prompt shape is clearly broad synthesis.
+
+    This keeps routing model-agnostic while preventing lookup/procedure drift on
+    prompts that explicitly request corpus-wide aggregation/structured survey output.
+    """
+    if primary_label not in {'lookup', 'procedure', 'troubleshooting', 'recommendation', 'validation', 'update'}:
+        return False
+    if not hints.mentions_multiple_items:
+        return False
+    return bool(
+        hints.requests_structure
+        or hints.requests_enumeration
+        or hints.requires_multi_period_analysis
+        or hints.requests_comparison
+    )
+
+
 class PromptCueAnalyzer:
     """Public entry point for query understanding."""
 
@@ -335,13 +356,32 @@ class PromptCueAnalyzer:
             ),
         }
 
+        semantic_hints = PromptCueSemanticHints(
+            mentions_multiple_items=mentions_multiple_items,
+            requests_comparison=requests_comparison,
+            requests_enumeration=requests_enumeration,
+            requests_structure=needs_structure,
+            mentions_time=mentions_time,
+            explicit_recency=explicit_recency,
+            requires_multi_period_analysis=requires_multi_period_analysis,
+        )
+
+        primary_label = decision.primary_label
+        scope = decision.scope
+        decision_notes = list(decision.decision_notes)
+        if _should_promote_to_coverage(primary_label=primary_label, hints=semantic_hints):
+            primary_label = 'coverage'
+            scope = PromptCueScope.BROAD
+            routing_hints[PromptCueRoutingHint.NEEDS_RETRIEVAL] = True
+            decision_notes.append('promoted_to_coverage_by_semantic_hints')
+
         return PromptCueQueryObject(
             schema_version         = PCUE_SCHEMA_VERSION,
             input_text             = text,
             normalized_text        = normalized,
             language               = language,
             is_continuation        = is_continuation,
-            primary_query_type     = decision.primary_label,
+            primary_query_type     = primary_label,
             classification_basis   = decision.classification_basis,
             candidate_query_types  = classification.candidates,
             confidence             = decision.confidence,
@@ -352,7 +392,7 @@ class PromptCueAnalyzer:
                 scope_confidence=decision.scope_confidence,
                 scope_confidence_margin=decision.scope_confidence_margin,
             ),
-            scope                  = decision.scope,
+            scope                  = scope,
             main_verbs             = linguistic.main_verbs,
             noun_phrases           = linguistic.noun_phrases,
             named_entities         = linguistic.named_entities,
@@ -360,17 +400,9 @@ class PromptCueAnalyzer:
             keywords               = keywords,
             routing_hints          = routing_hints,
             action_hints           = action_hints,
-            semantic_hints         = PromptCueSemanticHints(
-                mentions_multiple_items=mentions_multiple_items,
-                requests_comparison=requests_comparison,
-                requests_enumeration=requests_enumeration,
-                requests_structure=needs_structure,
-                mentions_time=mentions_time,
-                explicit_recency=explicit_recency,
-                requires_multi_period_analysis=requires_multi_period_analysis,
-            ),
+            semantic_hints         = semantic_hints,
             explanations           = PromptCueExplanations(
-                decision_notes=decision.decision_notes,
+                decision_notes=decision_notes,
                 evidence_tokens=_extract_evidence_tokens(normalized),
             ),
         )
