@@ -18,7 +18,11 @@ from promptcue.extraction.keywords import PromptCueKeywordExtractor
 from promptcue.extraction.language import PromptCueLanguageDetector
 from promptcue.extraction.linguistic import PromptCueLinguisticExtractor
 from promptcue.extraction.normalization import normalize_text
-from promptcue.models.enums import PromptCueBasis, PromptCueRoutingHint
+from promptcue.models.enums import (
+    PromptCueActionHint,
+    PromptCueBasis,
+    PromptCueRoutingHint,
+)
 from promptcue.models.schema import (
     PromptCueConfidenceMeta,
     PromptCueExplanations,
@@ -136,6 +140,33 @@ _TEMPORAL_SCOPE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r'\bQ[1-4]\s+(?:19|20)\d{2}\b'),
     re.compile(r'\b(?:19|20)\d{2}\s+Q[1-4]\b'),
 ]
+
+
+# Explicit freshness cues ("now/current/latest" style) that should request
+# recency checks even when no explicit year/period aggregation is present.
+_EXPLICIT_RECENCY_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r'\btoday\b', re.IGNORECASE),
+    re.compile(r'\btomorrow\b', re.IGNORECASE),
+    re.compile(r'\byesterday\b', re.IGNORECASE),
+    re.compile(r'\bright\s+now\b', re.IGNORECASE),
+    re.compile(r'\bnow\b', re.IGNORECASE),
+    re.compile(r'\bcurrently\b', re.IGNORECASE),
+    re.compile(r'\bcurrent\b', re.IGNORECASE),
+    re.compile(r'\blatest\b', re.IGNORECASE),
+    re.compile(r'\bmost\s+recent\b', re.IGNORECASE),
+    re.compile(r'\brecent\b', re.IGNORECASE),
+    re.compile(r'\bup[-\s]*to[-\s]*date\b', re.IGNORECASE),
+    re.compile(r'\breal[-\s]*time\b', re.IGNORECASE),
+    re.compile(r'\blive\b', re.IGNORECASE),
+    re.compile(r'\bthis\s+week\b', re.IGNORECASE),
+    re.compile(r'\bthis\s+month\b', re.IGNORECASE),
+    re.compile(r'\bthis\s+year\b', re.IGNORECASE),
+]
+
+
+def _detect_explicit_recency(text: str) -> bool:
+    """Return True when text explicitly asks for up-to-date/current information."""
+    return any(pat.search(text) for pat in _EXPLICIT_RECENCY_PATTERNS)
 
 
 def _detect_mentions_time(text: str) -> bool:
@@ -265,6 +296,7 @@ class PromptCueAnalyzer:
         is_continuation  = _detect_continuation(normalized)
         needs_structure  = _detect_needs_structure(text)   # use raw text for Markdown patterns
         mentions_time = _detect_mentions_time(normalized)
+        explicit_recency = _detect_explicit_recency(normalized)
         requires_multi_period_analysis = _detect_requires_multi_period_analysis(normalized)
         mentions_multiple_items = _detect_mentions_multiple_items(normalized)
         requests_comparison = _detect_requests_comparison(normalized)
@@ -290,6 +322,17 @@ class PromptCueAnalyzer:
         routing_hints = {
             **decision.routing_hints,
             PromptCueRoutingHint.NEEDS_STRUCTURE: needs_structure,
+            PromptCueRoutingHint.NEEDS_CURRENT_INFO: (
+                bool(decision.routing_hints.get(PromptCueRoutingHint.NEEDS_CURRENT_INFO))
+                or explicit_recency
+            ),
+        }
+        action_hints = {
+            **decision.action_hints,
+            PromptCueActionHint.CHECK_RECENCY: (
+                bool(decision.action_hints.get(PromptCueActionHint.CHECK_RECENCY))
+                or explicit_recency
+            ),
         }
 
         return PromptCueQueryObject(
@@ -316,13 +359,14 @@ class PromptCueAnalyzer:
             entities               = linguistic.entities,
             keywords               = keywords,
             routing_hints          = routing_hints,
-            action_hints           = decision.action_hints,
+            action_hints           = action_hints,
             semantic_hints         = PromptCueSemanticHints(
                 mentions_multiple_items=mentions_multiple_items,
                 requests_comparison=requests_comparison,
                 requests_enumeration=requests_enumeration,
                 requests_structure=needs_structure,
                 mentions_time=mentions_time,
+                explicit_recency=explicit_recency,
                 requires_multi_period_analysis=requires_multi_period_analysis,
             ),
             explanations           = PromptCueExplanations(

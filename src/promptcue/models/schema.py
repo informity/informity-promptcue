@@ -70,6 +70,7 @@ class PromptCueSemanticHints(BaseModel):
     requests_enumeration: bool = False
     requests_structure: bool = False
     mentions_time: bool = False
+    explicit_recency: bool = False
     requires_multi_period_analysis: bool = False
 
 

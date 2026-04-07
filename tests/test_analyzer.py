@@ -79,3 +79,12 @@ async def test_warm_up_async_completes() -> None:
     # After async warm-up, a subsequent analyze call must complete without loading
     result = await analyzer.analyze_async('what is machine learning')
     assert result.primary_query_type != ''
+
+
+def test_explicit_recency_promotes_freshness_hints() -> None:
+    result = PromptCueAnalyzer().analyze('What is the weather in Escondido today and tomorrow?')
+    assert result.routing_hints.get('needs_current_info') is True
+    assert result.action_hints.get('should_check_recency') is True
+    assert result.semantic_hints.explicit_recency is True
+    assert result.semantic_hints.mentions_time is False
+    assert result.primary_query_type in _KNOWN_TYPES

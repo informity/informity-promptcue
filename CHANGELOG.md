@@ -9,6 +9,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-04-06
+
+### Added
+
+- `semantic_hints.explicit_recency` on `PromptCueQueryObject` for explicit freshness wording
+  (for example: `today`, `tomorrow`, `now`, `current`, `latest`, `this week/month/year`)
+- Explicit-recency promotion in analyzer: when explicit freshness wording is detected,
+  PromptCue now sets `routing_hints['needs_current_info']=True` and
+  `action_hints['should_check_recency']=True` even when primary type is not `update`
+
+### Changed
+
+- README field guidance updated for freshness routing:
+  prefer `routing_hints['needs_current_info']` and `semantic_hints.explicit_recency`
+  for web-search/recency-aware pipelines
+
+---
+
+## [0.3.2] — 2026-03-28
+
 ### Added
 
 - `PromptCueConfig.embed_fn: Callable[[str], list[float]] | None` — injectable embed
@@ -37,6 +57,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `decision_notes`, `evidence_tokens`
 - Temporal semantics now live only in `semantic_hints`:
   `mentions_time` + `requires_multi_period_analysis` (not duplicated in `routing_hints`)
+- `semantic_hints.explicit_recency` on `PromptCueQueryObject`:
+  `True` when query includes explicit freshness wording (for example: `today`,
+  `tomorrow`, `now`, `current`, `latest`, `this week/month/year`)
+- Explicit-recency promotion in analyzer:
+  when explicit freshness wording is detected, PromptCue now sets
+  `routing_hints['needs_current_info']=True` and
+  `action_hints['should_check_recency']=True` even when primary type is not
+  `update`
 - 25 new tests in `tests/test_core.py::TestTemporalScope` covering True/False detector cases
   and end-to-end routing_hints key presence
 - `PromptCueConfig.show_progress_bar: bool` (default `False`) — standalone-mode control

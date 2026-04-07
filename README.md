@@ -357,6 +357,7 @@ pipeline actually needs to decide — you rarely need all of them.
 | How to structure the LLM response | `action_hints` | `should_enumerate`, `should_compare`, `should_direct_answer` |
 | Whether to retrieve / reason / check freshness | `routing_hints` | `needs_retrieval`, `needs_current_info`, `needs_reasoning` |
 | Whether the query mentions time | `semantic_hints.mentions_time` | `True` / `False` |
+| Whether the query explicitly asks for current/fresh info | `semantic_hints.explicit_recency` | `True` / `False` |
 | Whether the query requires cross-period analysis | `semantic_hints.requires_multi_period_analysis` | `True` / `False` |
 | Whether the user wants a specific output format | `routing_hints['needs_structure']` | `True` / `False` |
 | Whether the query continues a prior conversation | `is_continuation` | `True` / `False` |
@@ -365,8 +366,9 @@ pipeline actually needs to decide — you rarely need all of them.
 **Common patterns:**
 
 - **Simple LLM router** — branch on `primary_query_type` alone. Done.
-- **RAG pipeline** — use `routing_hints['needs_retrieval']` to decide whether to retrieve,
-  `routing_hints['needs_current_info']` to check freshness, and `scope` to decide how many
+- **RAG pipeline** — use `routing_hints['needs_retrieval']` to decide whether to retrieve.
+  Use `routing_hints['needs_current_info']` (or `semantic_hints.explicit_recency`) to trigger
+  freshness checks/web search, and `scope` to decide how many
   results to fetch (broad → more, focused → fewer).
 - **Response generator** — act on `action_hints`: `should_enumerate` → numbered list,
   `should_compare` → side-by-side table, `should_direct_answer` → single concise answer.

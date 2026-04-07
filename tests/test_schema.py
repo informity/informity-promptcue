@@ -181,6 +181,14 @@ def test_semantic_hints_present() -> None:
     assert result.semantic_hints.requires_multi_period_analysis is True
 
 
+
+def test_explicit_recency_semantic_hint_present() -> None:
+    result = PromptCueAnalyzer().analyze('Who is the current US president?')
+    assert isinstance(result.semantic_hints.explicit_recency, bool)
+    assert result.semantic_hints.explicit_recency is True
+    assert result.routing_hints.get('needs_current_info') is True
+    assert result.action_hints.get(PCUE_ACTION_CHECK_RECENCY) is True
+
 def test_explanations_present() -> None:
     result = PromptCueAnalyzer().analyze('How do I configure Redis cache step by step?')
     assert isinstance(result.explanations.decision_notes, list)
