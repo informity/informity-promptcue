@@ -9,6 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.5] — 2026-04-07
+
 ### Changed
 
 - Intent routing now promotes focused-family labels to `coverage` for clearly broad, multi-item structured prompts (model-agnostic heuristic based on semantic hints).
