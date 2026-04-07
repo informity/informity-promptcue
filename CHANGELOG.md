@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-04-06
+
+### Changed
+
+- Documentation alignment for explicit recency signals:
+  `semantic_hints.explicit_recency` is now consistently documented across README and changelog
+- Release notes cleanup: `0.3.3` and `0.3.2` sections normalized for accurate historical record
+
+---
+
 ## [0.3.3] — 2026-04-06
 
 ### Added
