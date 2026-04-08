@@ -9,6 +9,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.6] — 2026-04-08
+
+### Fixed
+
+- Broad “across all sources” entity/date prompts no longer fall back to `unknown`;
+  analyzer now promotes these multi-item synthesis/listing shapes to `coverage`.
+- Coverage promotion now also applies when the initial classifier label is `unknown`,
+  as long as broad multi-item semantic signals are present.
+
+### Changed
+
+- Expanded generic enumeration detection for prompts like “what are the names/dates/...”
+  to improve stable routing for corpus-wide listing requests.
+
 ## [0.3.5] — 2026-04-07
 
 ### Changed

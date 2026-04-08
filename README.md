@@ -372,6 +372,8 @@ pipeline actually needs to decide — you rarely need all of them.
   Use `routing_hints['needs_current_info']` (or `semantic_hints.explicit_recency`) to trigger
   freshness checks/web search, and `scope` to decide how many
   results to fetch (broad → more, focused → fewer).
+  For broad prompts like “names/dates across all sources”, PromptCue promotes to
+  `primary_query_type='coverage'` when multi-item synthesis/listing signals are present.
 - **Response generator** — act on `action_hints`: `should_enumerate` → numbered list,
   `should_compare` → side-by-side table, `should_direct_answer` → single concise answer.
 - **Time-aware pipeline** — gate temporal aggregation on `semantic_hints.requires_multi_period_analysis`.
