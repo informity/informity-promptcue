@@ -332,7 +332,7 @@ PromptCue ships with a default registry of 13 query types:
 | `analysis` | exploratory | Deep evaluation of a system, architecture, or decision |
 | `chitchat` | broad | Social or conversational, not a knowledge query |
 | `comparison` | comparative | Asks to compare two or more options |
-| `conversation_summary` | focused | Recap the current conversation itself (topics, key points, open items) |
+| `chat_summary` | focused | Recap the current conversation itself (topics, key points, open items) |
 | `coverage` | broad | Broad overview or "tell me everything" request |
 | `generation` | focused | Produce entirely new content from scratch with no existing source to condense |
 | `lookup` | focused | Factual question with a single direct answer |

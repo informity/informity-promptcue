@@ -17,7 +17,7 @@ def test_registry_contains_expected_labels() -> None:
     registry = PromptCueRegistry()
     labels   = {qt.label for qt in registry.get_query_types()}
     expected = {'coverage', 'lookup', 'comparison', 'recommendation', 'troubleshooting',
-                'procedure', 'analysis', 'update', 'conversation_summary', 'chitchat'}
+                'procedure', 'analysis', 'update', 'chat_summary', 'chitchat'}
     assert expected.issubset(labels)
 
 

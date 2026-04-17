@@ -767,7 +767,7 @@ query_types:
       should_clarify:                   false
       should_respond_conversationally:  false
 
-  - label: conversation_summary
+  - label: chat_summary
     description: Request to recap or summarize the current conversation itself.
     scope: focused
     negatives:

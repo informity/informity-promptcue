@@ -78,9 +78,9 @@ def test_semantic_routing_hints_populated(semantic_analyzer: PromptCueAnalyzer) 
     assert 'needs_chat_history' in result.routing_hints
 
 
-def test_semantic_scores_conversation_summary_query(semantic_analyzer: PromptCueAnalyzer) -> None:
+def test_semantic_scores_chat_summary_query(semantic_analyzer: PromptCueAnalyzer) -> None:
     result = semantic_analyzer.analyze('Can you recap what we discussed in this conversation?')
-    assert result.primary_query_type == 'conversation_summary'
+    assert result.primary_query_type == 'chat_summary'
     assert result.routing_hints.get('needs_chat_history') is True
 
 

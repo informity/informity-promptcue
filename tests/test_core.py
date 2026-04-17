@@ -274,11 +274,11 @@ class TestClassifierTiers:
         for c in result.candidates:
             assert 0.0 <= c.score <= 1.0
 
-    def test_conversation_summary_trigger_match(self, det_classifier: PromptCueClassifier) -> None:
+    def test_chat_summary_trigger_match(self, det_classifier: PromptCueClassifier) -> None:
         result = det_classifier._classify_deterministic('summarize our chat so far')
         top = result.candidates[0]
         assert top.basis == PCUE_BASIS_TRIGGER_MATCH
-        assert top.label == 'conversation_summary'
+        assert top.label == 'chat_summary'
 
     def test_semantic_disabled_returns_deterministic(self) -> None:
         config   = PromptCueConfig(enable_semantic_scoring=False)
