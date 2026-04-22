@@ -20,14 +20,14 @@ class PromptCueModelLoadError(PromptCueError):
     """
 
     def __init__(self, model_name: str, cache_path: str, cause: BaseException) -> None:
-        self.model_name  = model_name
-        self.cache_path  = cache_path
-        self.cause       = cause
+        self.model_name = model_name
+        self.cache_path = cache_path
+        self.cause = cause
         super().__init__(
-            f'Failed to load sentence-transformers model {model_name!r} '
-            f'from cache path {cache_path!r}.\n'
-            f'Ensure the model is pre-downloaded before starting the service:\n'
+            f"Failed to load sentence-transformers model {model_name!r} "
+            f"from cache path {cache_path!r}.\n"
+            f"Ensure the model is pre-downloaded before starting the service:\n"
             f'  python -c "from sentence_transformers import SentenceTransformer; '
             f'SentenceTransformer({model_name!r})"\n'
-            f'Cause: {cause}'
+            f"Cause: {cause}"
         )

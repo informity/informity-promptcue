@@ -21,86 +21,42 @@ from promptcue.extraction.normalization import normalize_text
 from promptcue.models.enums import (
     PromptCueActionHint,
     PromptCueBasis,
+    PromptCueContinuationSignal,
+    PromptCueDiscourseSignal,
+    PromptCueFollowupSignal,
+    PromptCueOutputFormat,
     PromptCueRoutingHint,
     PromptCueScope,
+    PromptCueTopicShiftSignal,
 )
 from promptcue.models.schema import (
     PromptCueConfidenceMeta,
     PromptCueExplanations,
+    PromptCuePromptSignals,
     PromptCueQueryObject,
     PromptCueSemanticHints,
+)
+from promptcue.patterns import (
+    COMPARISON_PATTERNS,
+    CONTINUATION_PATTERNS,
+    CONTINUATION_REQUEST_PATTERNS,
+    DISCOURSE_PREFIX_PATTERN,
+    ENUMERATION_PATTERNS,
+    EXPLICIT_RECENCY_PATTERNS,
+    MULTI_ITEM_PATTERNS,
+    MULTI_PERIOD_PATTERNS,
+    OUTPUT_FORMAT_PATTERNS,
+    REFERENTIAL_FOLLOWUP_PATTERN,
+    STRUCTURE_PATTERNS,
+    SYNTHESIS_PATTERNS,
+    TEMPORAL_SCOPE_PATTERNS,
+    TOPIC_SHIFT_CUE_PATTERN,
+    YEAR_TOKEN_PATTERN,
 )
 
 # ==============================================================================
 # Pre-classification detectors — pure regex, no model dependency
 # ==============================================================================
-
-# Openers that indicate the query is a follow-up to a previous turn.
-_CONTINUATION_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r'^\s*also[,\s]', re.IGNORECASE),
-    re.compile(r'^\s*and\s+(what\s+about|also|another)\b', re.IGNORECASE),
-    re.compile(r'^\s*what\s+about\s', re.IGNORECASE),
-    re.compile(r'^\s*furthermore[,\s]', re.IGNORECASE),
-    re.compile(r'^\s*additionally[,\s]', re.IGNORECASE),
-    re.compile(r'^\s*following\s+up\b', re.IGNORECASE),
-    re.compile(r'^\s*oh\s+and\b', re.IGNORECASE),
-    re.compile(r'^\s*one\s+more\s+(thing|question)\b', re.IGNORECASE),
-    re.compile(r'^\s*building\s+on\s+(that|this|what)', re.IGNORECASE),
-    re.compile(r'^\s*to\s+follow\s+up\b', re.IGNORECASE),
-    re.compile(r'^\s*going\s+back\s+to\b', re.IGNORECASE),
-    re.compile(r'^\s*on\s+that\s+(note|topic|subject)\b', re.IGNORECASE),
-    re.compile(r'^\s*related\s+to\s+that\b', re.IGNORECASE),
-]
-
-# Patterns indicating the caller wants a specific output structure.
-_STRUCTURE_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r'#{1,6}\s+\w', re.MULTILINE),          # Markdown headings in the query
-    re.compile(r'\bformat\s+(this\s+)?as\b', re.IGNORECASE),
-    re.compile(r'\boutput\s+(this\s+)?as\s+(a\s+)?table\b', re.IGNORECASE),
-    re.compile(r'\bin\s+a\s+(markdown\s+)?table\b', re.IGNORECASE),
-    re.compile(r'\bas\s+a\s+table\b', re.IGNORECASE),
-    re.compile(r'\bformatted\s+as\b', re.IGNORECASE),
-    re.compile(r'\bin\s+bullet\s+(points?|form)\b', re.IGNORECASE),
-    re.compile(r'\bwith\s+(?:the\s+following\s+)?sections?:', re.IGNORECASE),
-    re.compile(r'\borganiz(?:e|ed)\s+(?:it\s+)?as\b', re.IGNORECASE),
-    re.compile(r'\bstructur(?:e|ed)\s+(?:it\s+)?as\b', re.IGNORECASE),
-    re.compile(r'\bpresent\s+(?:this|it)\s+as\b', re.IGNORECASE),
-]
-_MULTI_ITEM_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(
-        (
-            r'\b(across all|across the entire|all (?:documents|files|records|sources|entries)'
-            r'|multiple (?:documents|files|records|sources|entries))\b'
-        ),
-        re.IGNORECASE,
-    ),
-    re.compile(r'\b(documents|files|records|sources|entries|items)\b', re.IGNORECASE),
-    re.compile(r'\bmost important (?:dates|amounts|figures|names)\b', re.IGNORECASE),
-]
-_SYNTHESIS_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r'\b(summarize|summary|overview|key findings?|main findings?)\b', re.IGNORECASE),
-    re.compile(r'\b(tell me about|describe)\b', re.IGNORECASE),
-]
-_COMPARISON_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(
-        r'\b(compare|contrast|versus|vs\.?|trade[-\s]*offs?|pros?\s+and\s+cons?)\b',
-        re.IGNORECASE,
-    ),
-]
-_ENUMERATION_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(
-        r'\b(list|enumerate|step[-\s]*by[-\s]*step|top\s+\d+|bullet(?:s| points?)?)\b',
-        re.IGNORECASE,
-    ),
-    re.compile(
-        (
-            r'\bwhat\s+are\s+the\s+'
-            r'(?:(?:most|key)\s+important\s+)?'
-            r'(?:names?|people|dates?|amounts?|figures?|values?)\b'
-        ),
-        re.IGNORECASE,
-    ),
-]
 
 
 def _detect_continuation(text: str) -> bool:
@@ -110,7 +66,7 @@ def _detect_continuation(text: str) -> bool:
     Does not change primary_query_type; purely informational for callers
     that maintain session context.
     """
-    return any(pat.search(text) for pat in _CONTINUATION_PATTERNS)
+    return any(pat.search(text) for pat in CONTINUATION_PATTERNS)
 
 
 def _detect_needs_structure(text: str) -> bool:
@@ -120,70 +76,39 @@ def _detect_needs_structure(text: str) -> bool:
     'with sections:', etc.  These indicate the caller has prescribed a response
     format, which downstream generators should respect.
     """
-    return any(pat.search(text) for pat in _STRUCTURE_PATTERNS)
+    return any(pat.search(text) for pat in STRUCTURE_PATTERNS)
 
 
-# Patterns indicating the query has a temporal scope — references a specific time
-# period, a year-over-year comparison, or a temporal aggregation.  Pure regex,
-# no model dependency; runs before classification.
-#
-# Scope: generic signals any time-aware application can act on.
-# Corpus-specific interpretations (e.g. aggregate_by_period, group_by='year')
-# are the caller's responsibility and must stay in the consuming application.
-_TEMPORAL_SCOPE_PATTERNS: list[re.Pattern[str]] = [
-    # Specific 4-digit year reference (1900–2099)
-    re.compile(r'\b(?:19|20)\d{2}\b'),
-    # Year-over-year and multi-year aggregation phrases
-    re.compile(r'\byear[-\s]*(?:by|over)[-\s]*year\b',   re.IGNORECASE),
-    re.compile(r'\bcross[-\s]*year\b',                    re.IGNORECASE),
-    re.compile(r'\bby\s+year\b',                          re.IGNORECASE),
-    re.compile(r'\byears?\s+covered\b',                   re.IGNORECASE),
-    re.compile(r'\byear[-\s]*to[-\s]*date\b',             re.IGNORECASE),
-    re.compile(r'\bYTD\b'),
-    # Duration phrases: "over/in/for the last/past N years"
-    re.compile(
-        r'\b(?:over|in|for)\s+the\s+(?:last|past)\s+\d+\s+years?\b', re.IGNORECASE,
-    ),
-    # Explicit year ranges: "from 2020 to 2023", "between 2018 and 2022"
-    re.compile(r'\bfrom\s+(?:19|20)\d{2}\s+to\s+(?:19|20)\d{2}\b',        re.IGNORECASE),
-    re.compile(r'\bbetween\s+(?:19|20)\d{2}\s+and\s+(?:19|20)\d{2}\b',    re.IGNORECASE),
-    # "since 2020", "starting from 2019"
-    re.compile(r'\bsince\s+(?:19|20)\d{2}\b',         re.IGNORECASE),
-    re.compile(r'\bstarting\s+(?:from\s+)?(?:19|20)\d{2}\b', re.IGNORECASE),
-    # Periodic trend phrases
-    re.compile(r'\b(?:quarterly|annual|monthly)\s+trend\b', re.IGNORECASE),
-    re.compile(r'\bover\s+time\b',                          re.IGNORECASE),
-    # Quarter references: "Q1 2023", "2023 Q4"
-    re.compile(r'\bQ[1-4]\s+(?:19|20)\d{2}\b'),
-    re.compile(r'\b(?:19|20)\d{2}\s+Q[1-4]\b'),
-]
+def _strip_discourse_prefix(text: str) -> tuple[str, bool]:
+    stripped = DISCOURSE_PREFIX_PATTERN.sub("", text, count=1).strip(" ,:;-")
+    if stripped and stripped != text:
+        return stripped, True
+    return text, False
 
 
-# Explicit freshness cues ("now/current/latest" style) that should request
-# recency checks even when no explicit year/period aggregation is present.
-_EXPLICIT_RECENCY_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r'\btoday\b', re.IGNORECASE),
-    re.compile(r'\btomorrow\b', re.IGNORECASE),
-    re.compile(r'\byesterday\b', re.IGNORECASE),
-    re.compile(r'\bright\s+now\b', re.IGNORECASE),
-    re.compile(r'\bnow\b', re.IGNORECASE),
-    re.compile(r'\bcurrently\b', re.IGNORECASE),
-    re.compile(r'\bcurrent\b', re.IGNORECASE),
-    re.compile(r'\blatest\b', re.IGNORECASE),
-    re.compile(r'\bmost\s+recent\b', re.IGNORECASE),
-    re.compile(r'\brecent\b', re.IGNORECASE),
-    re.compile(r'\bup[-\s]*to[-\s]*date\b', re.IGNORECASE),
-    re.compile(r'\breal[-\s]*time\b', re.IGNORECASE),
-    re.compile(r'\blive\b', re.IGNORECASE),
-    re.compile(r'\bthis\s+week\b', re.IGNORECASE),
-    re.compile(r'\bthis\s+month\b', re.IGNORECASE),
-    re.compile(r'\bthis\s+year\b', re.IGNORECASE),
-]
+def _detect_topic_shift_cue(text: str) -> bool:
+    return bool(TOPIC_SHIFT_CUE_PATTERN.search(text))
+
+
+def _detect_referential_followup(text: str) -> bool:
+    return bool(REFERENTIAL_FOLLOWUP_PATTERN.search(text))
+
+
+def _detect_continuation_request(text: str) -> bool:
+    return any(pat.search(text) for pat in CONTINUATION_REQUEST_PATTERNS)
+
+
+def _detect_output_formats(text: str) -> list[PromptCueOutputFormat]:
+    formats: list[PromptCueOutputFormat] = []
+    for key, pattern in OUTPUT_FORMAT_PATTERNS.items():
+        if pattern.search(text):
+            formats.append(PromptCueOutputFormat(key))
+    return formats
 
 
 def _detect_explicit_recency(text: str) -> bool:
     """Return True when text explicitly asks for up-to-date/current information."""
-    return any(pat.search(text) for pat in _EXPLICIT_RECENCY_PATTERNS)
+    return any(pat.search(text) for pat in EXPLICIT_RECENCY_PATTERNS)
 
 
 def _detect_mentions_time(text: str) -> bool:
@@ -195,49 +120,37 @@ def _detect_mentions_time(text: str) -> bool:
 
     Populates the generic semantic hint `mentions_time`.
     """
-    return any(pat.search(text) for pat in _TEMPORAL_SCOPE_PATTERNS)
-
-
-_MULTI_PERIOD_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r'\byear[-\s]*(?:by|over)[-\s]*year\b', re.IGNORECASE),
-    re.compile(r'\bcross[-\s]*year\b', re.IGNORECASE),
-    re.compile(r'\bby\s+year\b', re.IGNORECASE),
-    re.compile(r'\bover\s+time\b', re.IGNORECASE),
-    re.compile(r'\b(?:quarterly|annual|monthly)\s+trend\b', re.IGNORECASE),
-    re.compile(r'\b(?:over|in|for)\s+the\s+(?:last|past)\s+\d+\s+years?\b', re.IGNORECASE),
-    re.compile(r'\bfrom\s+(?:19|20)\d{2}\s+to\s+(?:19|20)\d{2}\b', re.IGNORECASE),
-    re.compile(r'\bbetween\s+(?:19|20)\d{2}\s+and\s+(?:19|20)\d{2}\b', re.IGNORECASE),
-]
+    return any(pat.search(text) for pat in TEMPORAL_SCOPE_PATTERNS)
 
 
 def _detect_requires_multi_period_analysis(text: str) -> bool:
     """Return True for prompts that explicitly require analysis across periods."""
-    if any(pat.search(text) for pat in _MULTI_PERIOD_PATTERNS):
+    if any(pat.search(text) for pat in MULTI_PERIOD_PATTERNS):
         return True
-    years = re.findall(r'\b(?:19|20)\d{2}\b', text)
+    years = YEAR_TOKEN_PATTERN.findall(text)
     return len(set(years)) >= 2
 
 
 def _detect_mentions_multiple_items(text: str) -> bool:
-    return any(pat.search(text) for pat in _MULTI_ITEM_PATTERNS)
+    return any(pat.search(text) for pat in MULTI_ITEM_PATTERNS)
 
 
 def _detect_requests_comparison(text: str) -> bool:
-    return any(pat.search(text) for pat in _COMPARISON_PATTERNS)
+    return any(pat.search(text) for pat in COMPARISON_PATTERNS)
 
 
 def _detect_requests_enumeration(text: str) -> bool:
-    return any(pat.search(text) for pat in _ENUMERATION_PATTERNS)
+    return any(pat.search(text) for pat in ENUMERATION_PATTERNS)
 
 
 def _detect_requests_synthesis(text: str) -> bool:
-    return any(pat.search(text) for pat in _SYNTHESIS_PATTERNS)
+    return any(pat.search(text) for pat in SYNTHESIS_PATTERNS)
 
 
 def _extract_evidence_tokens(text: str, limit: int = 8) -> list[str]:
     seen: set[str] = set()
     tokens: list[str] = []
-    for token in re.findall(r'[a-z0-9][a-z0-9_-]{2,}', text.casefold()):
+    for token in re.findall(r"[a-z0-9][a-z0-9_-]{2,}", text.casefold()):
         if token in seen:
             continue
         seen.add(token)
@@ -259,13 +172,13 @@ def _should_promote_to_coverage(
     prompts that explicitly request corpus-wide aggregation/structured survey output.
     """
     if primary_label not in {
-        'lookup',
-        'procedure',
-        'troubleshooting',
-        'recommendation',
-        'validation',
-        'update',
-        'unknown',
+        "lookup",
+        "procedure",
+        "troubleshooting",
+        "recommendation",
+        "validation",
+        "update",
+        "unknown",
     }:
         return False
     if not hints.mentions_multiple_items:
@@ -283,21 +196,21 @@ class PromptCueAnalyzer:
     """Public entry point for query understanding."""
 
     def __init__(self, config: PromptCueConfig | None = None) -> None:
-        self.config            = config or PromptCueConfig()
-        registry_path          = self.config.registry_path or PCUE_DEFAULT_REGISTRY
-        self.registry          = PromptCueRegistry.from_yaml(registry_path)
-        self.classifier        = PromptCueClassifier(self.registry, self.config)
-        self.decision_engine   = PromptCueDecisionEngine(self.config, self.registry)
-        self.language_detector    = PromptCueLanguageDetector(
-            enabled = self.config.enable_language_detection,
+        self.config = config or PromptCueConfig()
+        registry_path = self.config.registry_path or PCUE_DEFAULT_REGISTRY
+        self.registry = PromptCueRegistry.from_yaml(registry_path)
+        self.classifier = PromptCueClassifier(self.registry, self.config)
+        self.decision_engine = PromptCueDecisionEngine(self.config, self.registry)
+        self.language_detector = PromptCueLanguageDetector(
+            enabled=self.config.enable_language_detection,
         )
         self.linguistic_extractor = PromptCueLinguisticExtractor(
-            enabled    = self.config.enable_linguistic_extraction,
-            model_name = self.config.spacy_model,
+            enabled=self.config.enable_linguistic_extraction,
+            model_name=self.config.spacy_model,
         )
-        self.keyword_extractor    = PromptCueKeywordExtractor(
-            enabled      = self.config.enable_keyword_extraction,
-            max_keywords = self.config.max_keywords,
+        self.keyword_extractor = PromptCueKeywordExtractor(
+            enabled=self.config.enable_keyword_extraction,
+            max_keywords=self.config.max_keywords,
         )
 
     # ==============================================================================
@@ -342,12 +255,13 @@ class PromptCueAnalyzer:
 
     def analyze(self, text: str) -> PromptCueQueryObject:
         """Analyze a natural-language query and return a structured PromptCueQueryObject."""
-        normalized     = normalize_text(text)
-        language       = self.language_detector.detect(normalized)
+        normalized = normalize_text(text)
+        _, has_discourse_prefix = _strip_discourse_prefix(normalized)
+        language = self.language_detector.detect(normalized)
 
         # Pre-classification structural signals — pure regex, no model dependency.
-        is_continuation  = _detect_continuation(normalized)
-        needs_structure  = _detect_needs_structure(text)   # use raw text for Markdown patterns
+        is_continuation = _detect_continuation(normalized)
+        needs_structure = _detect_needs_structure(text)  # use raw text for Markdown patterns
         mentions_time = _detect_mentions_time(normalized)
         explicit_recency = _detect_explicit_recency(normalized)
         requires_multi_period_analysis = _detect_requires_multi_period_analysis(normalized)
@@ -355,6 +269,10 @@ class PromptCueAnalyzer:
         requests_comparison = _detect_requests_comparison(normalized)
         requests_enumeration = _detect_requests_enumeration(normalized)
         requests_synthesis = _detect_requests_synthesis(normalized)
+        has_topic_shift_cue = _detect_topic_shift_cue(normalized)
+        has_referential_followup = _detect_referential_followup(normalized)
+        requests_continuation = _detect_continuation_request(normalized)
+        requested_output_formats = _detect_output_formats(text)
 
         classification = self.classifier.classify(normalized)
 
@@ -368,9 +286,9 @@ class PromptCueAnalyzer:
             else None
         )
 
-        decision   = self.decision_engine.resolve(classification, threshold_override=threshold)
+        decision = self.decision_engine.resolve(classification, threshold_override=threshold)
         linguistic = self.linguistic_extractor.extract(normalized)
-        keywords   = self.keyword_extractor.extract(normalized)
+        keywords = self.keyword_extractor.extract(normalized)
 
         # Merge computed routing hints on top of YAML-derived hints from the decision engine.
         routing_hints = {
@@ -388,6 +306,34 @@ class PromptCueAnalyzer:
                 or explicit_recency
             ),
         }
+
+        prompt_signals = PromptCuePromptSignals(
+            has_discourse_prefix=has_discourse_prefix,
+            has_topic_shift_cue=has_topic_shift_cue,
+            has_referential_followup=has_referential_followup,
+            requests_continuation=requests_continuation,
+            requested_output_formats=requested_output_formats,
+            discourse_signal=(
+                PromptCueDiscourseSignal.PREFIX
+                if has_discourse_prefix
+                else PromptCueDiscourseSignal.NONE
+            ),
+            topic_shift_signal=(
+                PromptCueTopicShiftSignal.EXPLICIT_CUE
+                if has_topic_shift_cue
+                else PromptCueTopicShiftSignal.NONE
+            ),
+            followup_signal=(
+                PromptCueFollowupSignal.REFERENTIAL
+                if has_referential_followup
+                else PromptCueFollowupSignal.NONE
+            ),
+            continuation_signal=(
+                PromptCueContinuationSignal.REQUEST
+                if requests_continuation
+                else PromptCueContinuationSignal.NONE
+            ),
+        )
 
         semantic_hints = PromptCueSemanticHints(
             mentions_multiple_items=mentions_multiple_items,
@@ -407,38 +353,38 @@ class PromptCueAnalyzer:
             hints=semantic_hints,
             requests_synthesis=requests_synthesis,
         ):
-            primary_label = 'coverage'
+            primary_label = "coverage"
             scope = PromptCueScope.BROAD
             routing_hints[PromptCueRoutingHint.NEEDS_RETRIEVAL] = True
-            decision_notes.append('promoted_to_coverage_by_semantic_hints')
+            decision_notes.append("promoted_to_coverage_by_semantic_hints")
 
         return PromptCueQueryObject(
-            schema_version         = PCUE_SCHEMA_VERSION,
-            input_text             = text,
-            normalized_text        = normalized,
-            language               = language,
-            is_continuation        = is_continuation,
-            primary_query_type     = primary_label,
-            classification_basis   = decision.classification_basis,
-            candidate_query_types  = classification.candidates,
-            confidence             = decision.confidence,
-            confidence_band        = decision.confidence_band,
-            ambiguity_score        = decision.ambiguity_score,
-            confidence_meta        = PromptCueConfidenceMeta(
+            schema_version=PCUE_SCHEMA_VERSION,
+            input_text=text,
+            normalized_text=normalized,
+            language=language,
+            is_continuation=is_continuation,
+            primary_query_type=primary_label,
+            classification_basis=decision.classification_basis,
+            candidate_query_types=classification.candidates,
+            confidence=decision.confidence,
+            confidence_band=decision.confidence_band,
+            ambiguity_score=decision.ambiguity_score,
+            confidence_meta=PromptCueConfidenceMeta(
                 type_confidence_margin=decision.type_confidence_margin,
                 scope_confidence=decision.scope_confidence,
                 scope_confidence_margin=decision.scope_confidence_margin,
             ),
-            scope                  = scope,
-            main_verbs             = linguistic.main_verbs,
-            noun_phrases           = linguistic.noun_phrases,
-            named_entities         = linguistic.named_entities,
-            entities               = linguistic.entities,
-            keywords               = keywords,
-            routing_hints          = routing_hints,
-            action_hints           = action_hints,
-            semantic_hints         = semantic_hints,
-            explanations           = PromptCueExplanations(
+            scope=scope,
+            main_verbs=linguistic.main_verbs,
+            noun_phrases=linguistic.noun_phrases,
+            entities=linguistic.entities,
+            keywords=keywords,
+            routing_hints=routing_hints,
+            action_hints=action_hints,
+            semantic_hints=semantic_hints,
+            prompt_signals=prompt_signals,
+            explanations=PromptCueExplanations(
                 decision_notes=decision_notes,
                 evidence_tokens=_extract_evidence_tokens(normalized),
             ),

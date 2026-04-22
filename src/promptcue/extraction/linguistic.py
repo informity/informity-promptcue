@@ -19,11 +19,11 @@ class PromptCueLinguisticExtractor:
         python -m spacy download en_core_web_sm
     """
 
-    def __init__(self, enabled: bool = False, model_name: str = 'en_core_web_sm') -> None:
-        self.enabled    = enabled
+    def __init__(self, enabled: bool = False, model_name: str = "en_core_web_sm") -> None:
+        self.enabled = enabled
         self.model_name = model_name
-        self._nlp: Any  = None  # spacy.Language instance; typed as Any to avoid hard dep
-        self._lock      = threading.Lock()
+        self._nlp: Any = None  # spacy.Language instance; typed as Any to avoid hard dep
+        self._lock = threading.Lock()
 
     @property
     def is_loaded(self) -> bool:
@@ -51,25 +51,19 @@ class PromptCueLinguisticExtractor:
 
         # Root verbs only — the grammatical head of the main clause.
         main_verbs = [
-            token.lemma_
-            for token in doc
-            if token.dep_ == 'ROOT' and token.pos_ == 'VERB'
+            token.lemma_ for token in doc if token.dep_ == "ROOT" and token.pos_ == "VERB"
         ]
 
         # spaCy noun chunks are base noun phrases (no nested NPs).
         noun_phrases = [chunk.text for chunk in doc.noun_chunks]
 
         # Structured entities: surface text + spaCy entity type label (ORG, GPE, PRODUCT, etc.)
-        entities = [
-            PromptCueEntity(text=ent.text, entity_type=ent.label_)
-            for ent in doc.ents
-        ]
+        entities = [PromptCueEntity(text=ent.text, entity_type=ent.label_) for ent in doc.ents]
 
         return PromptCueLinguistics(
-            main_verbs     = main_verbs,
-            noun_phrases   = noun_phrases,
-            named_entities = [e.text for e in entities],  # plain text, backward compat
-            entities       = entities,
+            main_verbs=main_verbs,
+            noun_phrases=noun_phrases,
+            entities=entities,
         )
 
     # ==============================================================================
@@ -87,7 +81,7 @@ class PromptCueLinguisticExtractor:
                 import spacy
             except ImportError as exc:
                 raise ImportError(
-                    'Linguistic extraction requires spaCy. '
+                    "Linguistic extraction requires spaCy. "
                     'Install it with: pip install "promptcue[linguistic]"'
                 ) from exc
             try:
@@ -95,5 +89,5 @@ class PromptCueLinguisticExtractor:
             except OSError as exc:
                 raise OSError(
                     f'spaCy model "{self.model_name}" is not installed. '
-                    f'Download it with: python -m spacy download {self.model_name}'
+                    f"Download it with: python -m spacy download {self.model_name}"
                 ) from exc

@@ -330,9 +330,9 @@ PromptCue ships with a default registry of 13 query types:
 | Label | Scope | Description |
 |---|---|---|
 | `analysis` | exploratory | Deep evaluation of a system, architecture, or decision |
+| `chat_summary` | focused | Recap the current conversation itself (topics, key points, open items) |
 | `chitchat` | broad | Social or conversational, not a knowledge query |
 | `comparison` | comparative | Asks to compare two or more options |
-| `chat_summary` | focused | Recap the current conversation itself (topics, key points, open items) |
 | `coverage` | broad | Broad overview or "tell me everything" request |
 | `generation` | focused | Produce entirely new content from scratch with no existing source to condense |
 | `lookup` | focused | Factual question with a single direct answer |
@@ -362,6 +362,7 @@ pipeline actually needs to decide — you rarely need all of them.
 | Whether the query mentions time | `semantic_hints.mentions_time` | `True` / `False` |
 | Whether the query explicitly asks for current/fresh info | `semantic_hints.explicit_recency` | `True` / `False` |
 | Whether the query requires cross-period analysis | `semantic_hints.requires_multi_period_analysis` | `True` / `False` |
+| Whether prompt-level continuation/shift/format cues are present | `prompt_signals` | e.g. `has_topic_shift_cue=True`, `requested_output_formats=['table']` |
 | Whether the user wants a specific output format | `routing_hints['needs_structure']` | `True` / `False` |
 | Whether the query continues a prior conversation | `is_continuation` | `True` / `False` |
 | How confident the classifier is | `confidence` + `confidence_band` | `0.74`, `high` |
@@ -424,7 +425,7 @@ PromptCueAnalyzer(config: PromptCueConfig | None = None)
 | `enable_semantic_scoring` | `bool` | auto | `True` when `sentence-transformers` is installed or `embed_fn` is set, else `False` |
 | `embedding_model` | `str` | `all-MiniLM-L6-v2` | HuggingFace model name for semantic scoring (ignored when `embed_fn` is set) |
 | `enable_language_detection` | `bool` | `False` | Detect BCP-47 language code; requires `promptcue[detection]` |
-| `enable_linguistic_extraction` | `bool` | `False` | Extract verbs, noun phrases, named entities; requires `promptcue[linguistic]` |
+| `enable_linguistic_extraction` | `bool` | `False` | Extract verbs, noun phrases, and entities; requires `promptcue[linguistic]` |
 | `enable_keyword_extraction` | `bool` | `False` | Extract keyphrases via KeyBERT; requires `promptcue[keywords]` |
 | `max_keywords` | `int` | `8` | Maximum number of keyphrases to extract |
 | `spacy_model` | `str` | `en_core_web_sm` | spaCy model name for linguistic extraction |
@@ -450,11 +451,11 @@ PromptCueAnalyzer(config: PromptCueConfig | None = None)
 | `scope` | `str` | Query scope: `broad`, `focused`, `comparative`, `exploratory`, or `unknown` |
 | `main_verbs` | `list[str]` | Root verbs extracted by spaCy (empty when enrichment is off) |
 | `noun_phrases` | `list[str]` | Noun chunks extracted by spaCy (empty when enrichment is off) |
-| `named_entities` | `list[str]` | Named entity surface texts, plain strings (backward compat) |
 | `entities` | `list[PromptCueEntity]` | Named entities with `text` and `entity_type` (spaCy label) |
 | `keywords` | `list[PromptCueKeyword]` | Keyphrases with `text`, `weight`, and `kind` from KeyBERT |
 | `routing_hints` | `dict[str, bool]` | `needs_retrieval`, `needs_reasoning`, `needs_current_info`, `needs_chat_history`, `needs_clarification`, `needs_structure` |
 | `semantic_hints` | `PromptCueSemanticHints` | Agnostic semantic cues (`mentions_multiple_items`, `requests_comparison`, `requests_enumeration`, `requests_structure`, `mentions_time`, `explicit_recency`, `requires_multi_period_analysis`) |
+| `prompt_signals` | `PromptCuePromptSignals` | Prompt-shape cues (`has_discourse_prefix`, `has_topic_shift_cue`, `has_referential_followup`, `requests_continuation`, `requested_output_formats`) |
 | `confidence_meta` | `PromptCueConfidenceMeta` | Confidence diagnostics (`type_confidence_margin`, `scope_confidence`, `scope_confidence_margin`) |
 | `explanations` | `PromptCueExplanations` | Debug metadata (`decision_notes`, `evidence_tokens`) |
 | `action_hints` | `dict[str, bool]` | Response-generation directives: `should_survey`, `should_enumerate`, `should_compare`, `should_direct_answer`, `should_check_recency`, `should_clarify`, `should_respond_conversationally` |

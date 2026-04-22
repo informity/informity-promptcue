@@ -24,9 +24,9 @@ class PromptCueLanguageDetector:
     _MIN_TEXT_LENGTH: int = 10
 
     def __init__(self, enabled: bool = False) -> None:
-        self.enabled   = enabled
-        self._loaded   = False
-        self._lock     = threading.Lock()
+        self.enabled = enabled
+        self._loaded = False
+        self._lock = threading.Lock()
 
     @property
     def is_loaded(self) -> bool:
@@ -48,6 +48,7 @@ class PromptCueLanguageDetector:
         self._ensure_lib()
         try:
             from langdetect import detect as _detect
+
             result = _detect(text)
             return result if isinstance(result, str) else PCUE_UNKNOWN
         except Exception:
@@ -67,9 +68,10 @@ class PromptCueLanguageDetector:
                 return
             try:
                 import langdetect  # noqa: F401  # type: ignore[import-untyped]
+
                 self._loaded = True
             except ImportError as exc:
                 raise ImportError(
-                    'Language detection requires langdetect. '
+                    "Language detection requires langdetect. "
                     'Install it with: pip install "promptcue[detection]"'
                 ) from exc

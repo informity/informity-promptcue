@@ -9,6 +9,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `prompt_signals` documentation in README (`PromptCueQueryObject` field map and “Which field should I use?” guidance), including generic continuation/topic-shift/follow-up/output-format signal coverage.
+
+### Changed
+
+- Prompt-shape regex constants consolidated in `promptcue.patterns`, including a shared `YEAR_TOKEN_PATTERN` reused by analyzer multi-period detection.
+- Public lists were normalized for consistency and readability (alphabetical ordering where applicable in exports, enum members, output-format patterns, and query-type documentation table).
+
+### Removed
+
+- `named_entities` compatibility alias from schema and analyzer output; entity extraction now uses the structured `entities` field only (`text`, `entity_type`).
+
 ## [0.3.7] — 2026-04-17
 
 ### Added

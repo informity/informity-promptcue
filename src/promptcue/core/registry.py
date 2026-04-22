@@ -15,14 +15,15 @@ from promptcue.exceptions import PromptCueRegistryError
 @dataclass(slots=True)
 class PromptCueTypeDefinition:
     """A single query type entry loaded from the YAML registry."""
-    label:                    str
-    description:              str
-    triggers:                 list[str]       # short phrases for deterministic substring matching
-    examples:                 list[str]       # full sentences for semantic embedding anchors
-    negatives:                list[str]       # sentences this type should NOT match (penalty)
-    routing_hints:            dict[str, bool]
-    scope:                    str             # broad | focused | comparative | exploratory
-    action_hints:             dict[str, bool] # response-generation directives
+
+    label: str
+    description: str
+    triggers: list[str]  # short phrases for deterministic substring matching
+    examples: list[str]  # full sentences for semantic embedding anchors
+    negatives: list[str]  # sentences this type should NOT match (penalty)
+    routing_hints: dict[str, bool]
+    scope: str  # broad | focused | comparative | exploratory
+    action_hints: dict[str, bool]  # response-generation directives
     ambiguity_margin_override: float | None = None  # overrides PromptCueConfig.ambiguity_margin
 
 
@@ -36,17 +37,17 @@ class PromptCueRegistry:
     # Class-level annotations so mypy resolves instance attributes set in from_yaml()
     # via cls.__new__(), which bypasses __init__.
     definitions: list[PromptCueTypeDefinition]
-    _by_label:   dict[str, PromptCueTypeDefinition]
+    _by_label: dict[str, PromptCueTypeDefinition]
 
     def __init__(self, definitions: list[PromptCueTypeDefinition] | None = None) -> None:
         if definitions is None:
-            loaded           = self.from_yaml(PCUE_DEFAULT_REGISTRY)
+            loaded = self.from_yaml(PCUE_DEFAULT_REGISTRY)
             self.definitions = loaded.definitions
-            self._by_label   = loaded._by_label
+            self._by_label = loaded._by_label
         else:
             self._validate(definitions)
             self.definitions = definitions
-            self._by_label   = {defn.label: defn for defn in definitions}
+            self._by_label = {defn.label: defn for defn in definitions}
 
     # ==============================================================================
     # Queries
@@ -69,31 +70,31 @@ class PromptCueRegistry:
         try:
             raw = yaml.safe_load(path.read_text())
         except (OSError, yaml.YAMLError) as exc:
-            raise PromptCueRegistryError(f'Unable to load query type registry from {path}') from exc
+            raise PromptCueRegistryError(f"Unable to load query type registry from {path}") from exc
 
         if not isinstance(raw, dict):
             raise PromptCueRegistryError(
-                f'Registry file {path} is empty or does not contain a valid YAML mapping.'
+                f"Registry file {path} is empty or does not contain a valid YAML mapping."
             )
 
         definitions = [
             PromptCueTypeDefinition(
-                label                     = item['label'],
-                description               = item.get('description', ''),
-                triggers                  = item.get('triggers', []),
-                examples                  = item.get('examples', []),
-                negatives                 = item.get('negatives', []),
-                routing_hints             = item.get('routing_hints', {}),
-                scope                     = item.get('scope', PCUE_SCOPE_UNKNOWN),
-                action_hints              = item.get('action_hints', {}),
-                ambiguity_margin_override = item.get('ambiguity_margin_override'),
+                label=item["label"],
+                description=item.get("description", ""),
+                triggers=item.get("triggers", []),
+                examples=item.get("examples", []),
+                negatives=item.get("negatives", []),
+                routing_hints=item.get("routing_hints", {}),
+                scope=item.get("scope", PCUE_SCOPE_UNKNOWN),
+                action_hints=item.get("action_hints", {}),
+                ambiguity_margin_override=item.get("ambiguity_margin_override"),
             )
-            for item in raw.get('query_types', [])
+            for item in raw.get("query_types", [])
         ]
         instance = cls.__new__(cls)
         instance._validate(definitions)
         instance.definitions = definitions
-        instance._by_label   = {defn.label: defn for defn in definitions}
+        instance._by_label = {defn.label: defn for defn in definitions}
         return instance
 
     # ==============================================================================
@@ -106,7 +107,7 @@ class PromptCueRegistry:
         for defn in definitions:
             if not defn.label or not isinstance(defn.label, str):
                 raise PromptCueRegistryError(
-                    'Each query type entry must have a non-empty string label.'
+                    "Each query type entry must have a non-empty string label."
                 )
             if defn.label in seen_labels:
                 raise PromptCueRegistryError(f'Duplicate label in registry: "{defn.label}".')

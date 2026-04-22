@@ -39,17 +39,17 @@ class PromptCueEmbeddingBackend:
 
     def __init__(
         self,
-        model_name: str       = 'all-MiniLM-L6-v2',
-        cache_dir:  Path | None = None,
-        embed_fn:   Callable[[str], list[float]] | None = None,
+        model_name: str = "all-MiniLM-L6-v2",
+        cache_dir: Path | None = None,
+        embed_fn: Callable[[str], list[float]] | None = None,
         show_progress_bar: bool = False,
     ) -> None:
-        self._model_name  = model_name
-        self._cache_dir   = cache_dir
-        self._embed_fn    = embed_fn
+        self._model_name = model_name
+        self._cache_dir = cache_dir
+        self._embed_fn = embed_fn
         self._show_progress_bar = show_progress_bar
         self._model: SentenceTransformer | None = None
-        self._lock        = threading.Lock()
+        self._lock = threading.Lock()
 
     # ==============================================================================
     # Public interface
@@ -106,14 +106,15 @@ class PromptCueEmbeddingBackend:
                 from sentence_transformers import SentenceTransformer
             except ImportError as exc:
                 raise ImportError(
-                    'Semantic scoring requires the sentence-transformers package. '
+                    "Semantic scoring requires the sentence-transformers package. "
                     'Install it with: pip install "promptcue[semantic]"'
                 ) from exc
-            cache_path = str(self._cache_dir) if self._cache_dir else '<huggingface default>'
+            cache_path = str(self._cache_dir) if self._cache_dir else "<huggingface default>"
             try:
                 if self._cache_dir is not None:
                     self._model = SentenceTransformer(
-                        self._model_name, cache_folder=str(self._cache_dir),
+                        self._model_name,
+                        cache_folder=str(self._cache_dir),
                     )
                 else:
                     self._model = SentenceTransformer(self._model_name)
@@ -142,10 +143,10 @@ def cosine_similarity_batch(query: list[float], matrix: list[list[float]]) -> li
     """
     if not matrix:
         return []
-    q = np.array(query,  dtype=np.float32)
+    q = np.array(query, dtype=np.float32)
     m = np.array(matrix, dtype=np.float32)
     q_norm = np.linalg.norm(q)
     m_norms = np.linalg.norm(m, axis=1)
     denom = q_norm * m_norms
-    denom[denom == 0.0] = 1.0   # avoid division by zero; result will be 0 anyway
+    denom[denom == 0.0] = 1.0  # avoid division by zero; result will be 0 anyway
     return np.clip((m @ q) / denom, 0.0, 1.0).tolist()

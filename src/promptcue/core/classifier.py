@@ -42,9 +42,17 @@ def _top_margin(
 # Words immediately before a trigger phrase that indicate negation.
 # When one of these precedes a matched trigger, the match is demoted to word-overlap tier.
 # E.g. "When NOT to use caching" must not fire the procedure trigger "to use".
-_NEGATION_WORDS: frozenset[str] = frozenset({
-    'not', 'never', "don't", "dont", 'no', 'avoid', 'without',
-})
+_NEGATION_WORDS: frozenset[str] = frozenset(
+    {
+        "not",
+        "never",
+        "don't",
+        "dont",
+        "no",
+        "avoid",
+        "without",
+    }
+)
 
 
 class PromptCueClassifier:
@@ -63,8 +71,8 @@ class PromptCueClassifier:
     """
 
     def __init__(self, registry: PromptCueRegistry, config: PromptCueConfig) -> None:
-        self.registry          = registry
-        self.config            = config
+        self.registry = registry
+        self.config = config
         self.embedding_backend = PromptCueEmbeddingBackend(
             model_name=config.embedding_model,
             cache_dir=config.model_cache_dir,
@@ -72,10 +80,10 @@ class PromptCueClassifier:
             show_progress_bar=config.show_progress_bar,
         )
         # Cached per-label example embeddings; populated lazily on first semantic classify.
-        self._example_cache:   dict[str, list[list[float]]] = {}
+        self._example_cache: dict[str, list[list[float]]] = {}
         # Cached per-label negative embeddings; populated alongside _example_cache.
-        self._negative_cache:  dict[str, list[list[float]]] = {}
-        self._cache_lock       = threading.Lock()
+        self._negative_cache: dict[str, list[list[float]]] = {}
+        self._cache_lock = threading.Lock()
         # Pre-compiled word-boundary patterns — built once at init, reused on every
         # classify() call.  Prevents false positives from substring containment:
         # e.g. "vs" inside "devs", "hey" inside "they", "assess" inside "reassess".
@@ -117,8 +125,7 @@ class PromptCueClassifier:
 
         sem_top, _ = _top_margin(sem.candidates)
         sem_has_result = (
-            sem_top is not None
-            and sem_top.score >= self.config.semantic_similarity_threshold
+            sem_top is not None and sem_top.score >= self.config.semantic_similarity_threshold
         )
         if not sem_has_result:
             # Semantic cannot classify — fall back to deterministic.
@@ -135,7 +142,7 @@ class PromptCueClassifier:
             top_det is not None
             and top_det.basis == PCUE_BASIS_TRIGGER_MATCH
             and top_det.score >= self.config.trigger_fallback_threshold
-            and det_margin    >= self.config.ambiguity_margin
+            and det_margin >= self.config.ambiguity_margin
         )
 
         return det if trigger_override else sem
@@ -177,8 +184,8 @@ class PromptCueClassifier:
         appear in queries for grammatical reasons unrelated to intent — firing at
         0.90 on incidental vocabulary produced systematic false positives.
         """
-        scores:  list[PromptCueCandidate] = []
-        lowered: str                 = text.lower()
+        scores: list[PromptCueCandidate] = []
+        lowered: str = text.lower()
 
         # Pre-compute query content words (length > 2 filters most stop-words).
         query_words: frozenset[str] = frozenset(w for w in lowered.split() if len(w) > 2)
@@ -187,13 +194,14 @@ class PromptCueClassifier:
             trigger_pats = self._trigger_patterns[definition.label]
 
             matched = [
-                phrase for phrase, pat in trigger_pats
+                phrase
+                for phrase, pat in trigger_pats
                 if pat.search(lowered) and not self._is_negated(phrase, lowered)
             ]
             if matched:
                 # Longest match wins — proxy for trigger specificity.
-                best        = max(matched, key=len)
-                specificity = min(len(best) / 35.0, 1.0)   # normalise; 35 chars ≈ long trigger
+                best = max(matched, key=len)
+                specificity = min(len(best) / 35.0, 1.0)  # normalise; 35 chars ≈ long trigger
                 # Each additional matched trigger adds a small confidence bonus
                 # (+0.03 per extra, capped at +0.06).  Matching both "compare"
                 # and "pros and cons" is a stronger signal than either alone.
@@ -207,8 +215,8 @@ class PromptCueClassifier:
                 # now produce equivalent scores.  Lower absolute values (Jaccard ≤ query-
                 # normalised) mean more ambiguous queries fall through to semantic scoring.
                 type_words = self._type_vocab[definition.label]
-                union      = query_words | type_words
-                overlap    = len(query_words & type_words) / len(union) if union else 0.0
+                union = query_words | type_words
+                overlap = len(query_words & type_words) / len(union) if union else 0.0
                 if overlap > 0.0:
                     score = round(min(0.10 + 0.40 * overlap, 0.50), 4)
                     basis = PCUE_BASIS_WORD_OVERLAP
@@ -242,12 +250,16 @@ class PromptCueClassifier:
         for definition in self.registry.definitions:
             example_vecs = self._example_cache.get(definition.label, [])
             if not example_vecs:
-                scores.append(PromptCueCandidate(
-                    label=definition.label, score=0.0, basis=PCUE_BASIS_FALLBACK,
-                ))
+                scores.append(
+                    PromptCueCandidate(
+                        label=definition.label,
+                        score=0.0,
+                        basis=PCUE_BASIS_FALLBACK,
+                    )
+                )
                 continue
 
-            sims     = cosine_similarity_batch(query_vec, example_vecs)
+            sims = cosine_similarity_batch(query_vec, example_vecs)
             best_sim = max(sims) if sims else 0.0
 
             # Apply negative example penalty when configured and negatives exist.
@@ -257,11 +269,13 @@ class PromptCueClassifier:
                     neg_sims = cosine_similarity_batch(query_vec, neg_vecs)
                     best_sim = max(0.0, best_sim - max(neg_sims) * penalty_weight)
 
-            scores.append(PromptCueCandidate(
-                label=definition.label,
-                score=round(min(max(best_sim, 0.0), 1.0), 6),
-                basis=PCUE_BASIS_SEMANTIC,
-            ))
+            scores.append(
+                PromptCueCandidate(
+                    label=definition.label,
+                    score=round(min(max(best_sim, 0.0), 1.0), 6),
+                    basis=PCUE_BASIS_SEMANTIC,
+                )
+            )
 
         scores.sort(key=lambda item: item.score, reverse=True)
         return PromptCueClassificationResult(candidates=scores)
@@ -290,7 +304,7 @@ class PromptCueClassifier:
         result: dict[str, list[tuple[str, re.Pattern[str]]]] = {}
         for defn in self.registry.definitions:
             result[defn.label] = [
-                (phrase, re.compile(r'\b' + re.escape(phrase.lower()) + r'\b'))
+                (phrase, re.compile(r"\b" + re.escape(phrase.lower()) + r"\b"))
                 for phrase in defn.triggers
             ]
         return result
@@ -305,7 +319,7 @@ class PromptCueClassifier:
         """
         result: dict[str, frozenset[str]] = {}
         for defn in self.registry.definitions:
-            type_text = ' '.join(defn.triggers + defn.examples + [defn.description])
+            type_text = " ".join(defn.triggers + defn.examples + [defn.description])
             result[defn.label] = frozenset(w for w in type_text.lower().split() if len(w) > 2)
         return result
 
